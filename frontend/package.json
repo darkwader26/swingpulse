@@ -15,15 +15,15 @@
     "recharts": "^2.12.0",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.3.0",
-    "lucide-react": "^0.378.0"
-  },
-  "devDependencies": {
+    "lucide-react": "^0.378.0",
+    "typescript": "^5.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
+    "@types/react-dom": "^18.0.0"
+  },
+  "devDependencies": {
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.0.0"
+    "tailwindcss": "^3.4.0"
   }
 }
