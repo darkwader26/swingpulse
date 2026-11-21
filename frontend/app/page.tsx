@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { MoreHorizontal, Play, Stop, Activity, ShieldAlert, Clock, DollarSign } from "lucide-react"
+import { MoreHorizontal, Play, StopCircle, Activity, ShieldAlert, Clock, DollarSign } from "lucide-react"
 import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -105,7 +105,7 @@ export default function Dashboard() {
             variant={killSwitch ? "default" : "outline"}
             className="bg-danger text-white border-danger hover:bg-danger/90"
           >
-            {killSwitch ? "System Halted" : <><Stop size={16} /> Kill Switch</>}
+            {killSwitch ? "System Halted" : <><StopCircle size={16} /> Kill Switch</>}
           </Button>
         </div>
       </header>
