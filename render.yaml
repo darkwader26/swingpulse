@@ -1,0 +1,34 @@
+# Render deployment config for SwingPulse FastAPI backend
+# Create a Web Service + PostgreSQL database in Render dashboard,
+# or apply this file via Render's "Infrastructure as Code" if available.
+
+services:
+  - type: web
+    name: swingpulse-api
+    env: python
+    plan: free
+    region: oregon
+    rootDir: backend/api
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: EXECUTION_MODE
+        value: paper
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+databases:
+  - name: swingpulse-db
+    plan: free
+    region: oregon
+    # After creating, link DATABASE_URL in the web service env vars:
+    # Dashboard -> swingpulse-api -> Environment -> Add DATABASE_URL
+    # from the swingpulse-db connection string.

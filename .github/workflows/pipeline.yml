@@ -1,0 +1,41 @@
+name: SwingPulse Paper Trading Pipeline
+
+on:
+  schedule:
+    # Run every hour during US market hours (9:30am–4pm ET = 13:30–20:00 UTC)
+    # Weekdays only
+    - cron: '0 13-20 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions tab
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas sqlalchemy asyncpg
+
+      - name: Fetch latest market data
+        run: python backend/scripts/data_feed.py --once --days 200
+
+      - name: Run agent pipeline (paper trading)
+        run: python backend/scripts/run_pipeline.py --equity 100000
+
+      - name: Upload pipeline artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swingpulse-pipeline-results
+          path: |
+            backend/scripts/live_market_data.json
+          retention-days: 7
