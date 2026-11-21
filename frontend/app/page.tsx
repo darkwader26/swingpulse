@@ -97,8 +97,6 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  const toggleKillSwitch = () => setKillSwitch((prev) => !prev)
-
   const allOnline = agents
     ? Object.values(agents).every((a) => a.status === "active" || a.status === "standby")
     : true
@@ -110,6 +108,8 @@ export default function Dashboard() {
   const now = new Date()
   const timeStr = now.toLocaleTimeString("en-US", { hour12: false })
 
+  const toggleKillSwitch = () => setKillSwitch((prev) => !prev)
+
   return (
     <div className="h-full flex flex-col">
       <header className="flex items-center justify-between border-b border-border bg-surface/80 backdrop-blur pb-3 pt-2 z-10">
@@ -120,7 +120,7 @@ export default function Dashboard() {
             </div>
             <div>
               <span className="font-bold text-sm tracking-tight">SwingPulse</span>
-              <span className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Desk Terminal v0.2.0 — Long/Short</span>
+              <span className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Desk Terminal v0.2.0</span>
             </div>
           </div>
           <div className="flex items-center gap-3 border-l border-border pl-4 ml-3">
@@ -169,10 +169,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-2">
             <div className="risk-bar">
-              <div
-                className={`risk-fill ${riskPct > 0.8 ? "bg-danger" : riskPct > 0.5 ? "bg-warning" : "bg-success"}`}
-                style={{ width: `${riskPct * 100}%` }}
-              />
+              <div className={`risk-fill ${riskPct > 0.8 ? "bg-danger" : riskPct > 0.5 ? "bg-warning" : "bg-success"}`} style={{ width: `${riskPct * 100}%` }} />
             </div>
             <span className="text-[10px] text-muted mt-1">Daily loss exposure</span>
           </div>
@@ -298,10 +295,7 @@ export default function Dashboard() {
                       <span className="font-mono">{s.exposure}%</span>
                     </div>
                     <div className="risk-bar">
-                      <div
-                        className={`risk-fill ${s.exposure > s.limit ? "bg-danger" : "bg-accent"}`}
-                        style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }}
-                      />
+                      <div className={`risk-fill ${s.exposure > s.limit ? "bg-danger" : "bg-accent"}`} style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }} />
                     </div>
                     <span className="text-[10px] text-muted block mt-0.5">Limit {s.limit}%</span>
                   </div>
