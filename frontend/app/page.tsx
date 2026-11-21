@@ -409,9 +409,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-          </Card>
-        </div>
-      </div>
 
       <footer className="border-t border-surface-elev pt-4 text-[10px] text-muted">
         SwingPulse v0.1.0 — Paper Trading. Agent pipeline: Scanner → Signal → Risk → Execution → Ops. Not financial advice.
