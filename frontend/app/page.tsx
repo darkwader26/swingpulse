@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Clock, DollarSign, Activity, ShieldAlert, MoreHorizontal, Play, StopCircle, ChevronRight, Minus, Plus } from "lucide-react"
+import { Clock, DollarSign, Activity, ShieldAlert, MoreHorizontal, Play, StopCircle } from "lucide-react"
 import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -77,7 +77,6 @@ export default function Dashboard() {
   const [positions, setPositions] = useState<Position[]>(MOCK_POSITIONS)
   const [signals, setSignals] = useState<Signal[]>(MOCK_SIGNALS)
   const [logs, setLogs] = useState<string[]>([])
-  const [tickerTime, setTickerTime] = useState(0)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -98,33 +97,6 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  useEffect(() => {
-    const wsUrl = API_BASE.replace("http", "ws")
-    try {
-      const socket = new WebSocket(wsUrl)
-      socket.onopen = () => {
-        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] WebSocket connected`])
-      }
-      socket.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data)
-          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${JSON.stringify(msg).slice(0, 120)}`])
-        } catch {}
-      }
-      socket.onclose = () => {
-        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] WebSocket disconnected`])
-      }
-      return () => socket.close()
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    const t = setInterval(() => setTickerTime((t) => t + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
-
-  const toggleKillSwitch = () => setKillSwitch((prev) => !prev)
-
   const allOnline = agents
     ? Object.values(agents).every((a) => a.status === "active" || a.status === "standby")
     : true
@@ -136,9 +108,11 @@ export default function Dashboard() {
   const now = new Date()
   const timeStr = now.toLocaleTimeString("en-US", { hour12: false })
 
+  const toggleKillSwitch = () => setKillSwitch((prev) => !prev)
+
   return (
     <div className="h-full flex flex-col">
-      <header className="flex items-center justify-between border-b border-border pb-4">
+      <header className="flex items-center justify-between border-b border-border bg-surface/80 backdrop-blur pb-3 pt-2 z-10">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-[6px] bg-accent flex items-center justify-center text-[#080a0f] font-bold text-sm">
@@ -172,7 +146,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
         <Card className="card-hover">
           <div className="metric">
@@ -213,7 +186,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Main Grid */}
       <div className="flex-1 flex flex-col gap-3 p-3 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           <div className="lg:col-span-4 space-y-3">
@@ -247,20 +219,6 @@ export default function Dashboard() {
                 </table>
               </div>
             </Card>
-
-            <div className="ticker-container">
-              <div className="ticker-track">
-                {WATCHLIST.map((w) => (
-                  <div key={w.sym} className="ticker-item animate-slide-up" style={{ animationDelay: `${WATCHLIST.indexOf(w) * 0.5}s` }}>
-                    <span className="symbol">{w.sym}</span>
-                    <span className="price">${w.px.toFixed(2)}</span>
-                    <span className={`change ${w.ch >= 0 ? "pos" : "neg"}`}>
-                      {w.ch >= 0 ? "+" : ""}${w.ch.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="lg:col-span-5 space-y-3">
@@ -356,29 +314,6 @@ export default function Dashboard() {
                 </div>
               </div>
             </Card>
-
-            <Card className="card-hover flex-1 min-h-[200px]">
-              <h2 className="text-[10px] uppercase tracking-wider text-muted mb-2">Pending Signals</h2>
-              <div className="space-y-2">
-                {signals.map((s) => (
-                  <div key={s.symbol} className="p-2 rounded-[4px] border border-surface-elev bg-surface-elev/50">
-                    <div className="flex justify-between mb-1">
-                      <span className="font-mono text-xs">{s.symbol}</span>
-                      <Badge variant="default">{s.setup_type.replace(/_/g, " ").toUpperCase()}</Badge>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted mb-1">
-                      <span>{s.direction}</span>
-                      <span className="font-mono">RR {s.rr_ratio}</span>
-                      <span className="font-mono">Conf {Math.round(s.confidence * 100)}%</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => {}}>Approve</Button>
-                      <Button variant="outline" size="sm" onClick={() => {}}>Reject</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
           </div>
 
           <div className="lg:col-span-12">
@@ -410,7 +345,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <footer className="border-t border-surface-elev pt-4 text-[10px] text-muted">
+      <footer className="border-t border-surface-elev pt-2 pb-2 text-[10px] text-muted">
         SwingPulse v0.1.0 — Paper Trading. Agent pipeline: Scanner → Signal → Risk → Execution → Ops. Not financial advice.
       </footer>
     </div>
