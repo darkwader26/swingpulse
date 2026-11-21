@@ -168,10 +168,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-2">
             <div className="risk-bar">
-              <div
-                className={`risk-fill ${riskPct > 0.8 ? "bg-danger" : riskPct > 0.5 ? "bg-warning" : "bg-success"}`}
-                style={{ width: `${riskPct * 100}%` }}
-              />
+              <div className={`risk-fill ${riskPct > 0.8 ? "bg-danger" : riskPct > 0.5 ? "bg-warning" : "bg-success"}`} style={{ width: `${riskPct * 100}%` }} />
             </div>
             <span className="text-[10px] text-muted mt-1">Daily loss exposure</span>
           </div>
