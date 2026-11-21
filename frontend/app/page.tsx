@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://swingpulse-api-1.onrender.com/api/v1/"
 
 interface Position {
   symbol: string
@@ -28,6 +28,29 @@ interface Signal {
   confidence: number
 }
 
+interface AgentStatus {
+  status: string
+  last_run: string | null
+  errors: string[]
+}
+
+interface AgentsStatus {
+  scanner: AgentStatus
+  signal_generator: AgentStatus
+  risk_manager: AgentStatus
+  executor: AgentStatus
+  ops: AgentStatus
+}
+
+interface Risk {
+  daily_loss_percent: number
+  daily_loss_limit: number
+  open_positions: number
+  max_positions: number
+  sector_exposure: Record<string, number>
+  kill_switch: boolean
+}
+
 const MOCK_POSITIONS: Position[] = [
   { symbol: "AAPL", side: "Long", entry: 189.50, stop: 184.20, target: 196.80, qty: 145, unrealized_pnl: 442.00, r_multiple: "+0.83 R", age: "2d 4h" },
   { symbol: "NVDA", side: "Long", entry: 872.00, stop: 845.00, target: 908.00, qty: 45, unrealized_pnl: 315.00, r_multiple: "+0.60 R", age: "1d 12h" },
@@ -42,7 +65,7 @@ const MOCK_SIGNALS: Signal[] = [
   { symbol: "EEM", setup_type: "breakdown_20d_low", direction: "short", entry_price: 41.80, stop_price: 42.50, target_1: 40.60, rr_ratio: 2.0, confidence: 0.65 },
 ]
 
-const WATCHLIST = [
+const MOCK_WATCHLIST = [
   { sym: "AAPL", px: 189.50, ch: +1.24, reg: "Bull" },
   { sym: "NVDA", px: 872.00, ch: +2.10, reg: "Bull" },
   { sym: "MSFT", px: 418.30, ch: -0.45, reg: "Bull" },
@@ -52,6 +75,12 @@ const WATCHLIST = [
   { sym: "EEM", px: 41.80, ch: -0.15, reg: "Bear" },
   { sym: "SLV", px: 28.90, ch: +0.45, reg: "Neutral" },
 ]
+
+async function fetchJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" })
+  if (!res.ok) throw new Error(`${path}: ${res.status}`)
+  return res.json()
+}
 
 export default function Dashboard() {
   const [loggedIn, setLoggedIn] = useState(false)
@@ -65,6 +94,11 @@ export default function Dashboard() {
     "C:\\SWINGPULSE> AWAITING USER LOGON",
   ])
   const [killSwitch, setKillSwitch] = useState(false)
+  const [positions, setPositions] = useState<Position[]>([])
+  const [signals, setSignals] = useState<Signal[]>([])
+  const [risk, setRisk] = useState<Risk | null>(null)
+  const [agents, setAgents] = useState<AgentsStatus | null>(null)
+  const [loading, setLoading] = useState({ positions: true, signals: true, risk: true, agents: true })
   const terminalRef = useRef<HTMLDivElement>(null)
 
   const handleGoogleLogin = () => {
@@ -108,6 +142,90 @@ export default function Dashboard() {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
   }, [terminalLines])
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadData() {
+      try {
+        const [posRes, sigRes, riskRes, agentsRes] = await Promise.allSettled([
+          fetchJson<Position[]>("positions"),
+          fetchJson<Signal[]>("signals"),
+          fetchJson<Risk>("risk"),
+          fetchJson<AgentsStatus>("agents/status"),
+        ])
+
+        if (!mounted) return
+
+        if (posRes.status === "fulfilled") {
+          setPositions(posRes.value)
+        } else {
+          console.error("SwingPulse: failed to load positions", posRes.reason)
+        }
+        if (sigRes.status === "fulfilled") {
+          setSignals(sigRes.value)
+        } else {
+          console.error("SwingPulse: failed to load signals", sigRes.reason)
+        }
+        if (riskRes.status === "fulfilled") {
+          setRisk(riskRes.value)
+        } else {
+          console.error("SwingPulse: failed to load risk", riskRes.reason)
+        }
+        if (agentsRes.status === "fulfilled") {
+          setAgents(agentsRes.value)
+        } else {
+          console.error("SwingPulse: failed to load agents status", agentsRes.reason)
+        }
+
+        setLoading({ positions: false, signals: false, risk: false, agents: false })
+      } catch (err) {
+        console.error("SwingPulse: data load error", err)
+        if (mounted) {
+          setLoading({ positions: false, signals: false, risk: false, agents: false })
+        }
+      }
+    }
+
+    loadData()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // Fall back to mock data when the API is unavailable or still loading.
+  const displayPositions = loading.positions ? [] : (positions.length ? positions : MOCK_POSITIONS)
+  const displaySignals = loading.signals ? [] : (signals.length ? signals : MOCK_SIGNALS)
+
+  // Watchlist derives its symbols from positions/signals when the API has no
+  // dedicated watchlist endpoint; falls back to the mock watchlist otherwise.
+  const watchlist = useMemo(() => {
+    const symbols = Array.from(new Set([...positions.map((p) => p.symbol), ...signals.map((s) => s.symbol)]))
+    if (symbols.length === 0) return MOCK_WATCHLIST
+    return symbols.map((sym) => {
+      const pos = positions.find((p) => p.symbol === sym)
+      const sig = signals.find((s) => s.symbol === sym)
+      const px = pos?.entry ?? sig?.entry_price ?? 0
+      const reg =
+        pos?.side === "Long" || sig?.direction === "long"
+          ? "Bull"
+          : pos?.side === "Short" || sig?.direction === "short"
+            ? "Bear"
+            : "Neutral"
+      return { sym, px, ch: 0, reg }
+    })
+  }, [positions, signals])
+
+  const totalPnl = displayPositions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
+  const openPositions = displayPositions.filter((p) => p.side !== "Pending").length
+
+  const stageLabels: Record<string, string> = {
+    scanner: "Scanner",
+    signal_generator: "Signal",
+    risk_manager: "Risk",
+    executor: "Exec",
+    ops: "Ops",
+  }
 
   const now = new Date()
   const timeStr = now.toLocaleTimeString("en-US", { hour12: false })
@@ -182,26 +300,28 @@ export default function Dashboard() {
         <Card className="card-hover">
           <div className="metric">
             <span className="metric-label">Today P&L</span>
-            <span className="metric-value">+$1,240.50</span>
-            <span className="text-xs text-[#00ff00] font-mono">+1.24% · Win rate 62%</span>
+            <span className="metric-value">{totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}</span>
+            <span className={`text-xs font-mono ${totalPnl >= 0 ? "text-[#00ff00]" : "text-[#ff0000]"}`}>
+              {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} · {openPositions} open
+            </span>
           </div>
         </Card>
         <Card className="card-hover">
           <div className="metric">
             <span className="metric-label">Open Positions</span>
-            <span className="metric-value">{MOCK_POSITIONS.filter((p) => p.side !== "Pending").length}</span>
+            <span className="metric-value">{openPositions}</span>
             <span className="text-xs text-[#7c8290] font-mono">Max 8</span>
           </div>
         </Card>
         <Card className="card-hover">
           <div className="metric">
             <span className="metric-label">Daily Risk Left</span>
-            <span className="metric-value">$1,850</span>
+            <span className="metric-value">{risk ? `$${risk.daily_loss_limit.toFixed(0)}` : "$1,850"}</span>
             <span className="text-xs text-[#7c8290] font-mono">Limit: $2,000</span>
           </div>
           <div className="mt-2">
             <div className="risk-bar">
-              <div className="risk-fill bg-[#00ff00]" style={{ width: "7%" }} />
+              <div className="risk-fill bg-[#00ff00]" style={{ width: risk ? `${Math.min((risk.daily_loss_percent / risk.daily_loss_limit) * 100, 100)}%` : "7%" }} />
             </div>
             <span className="text-[10px] text-[#7c8290] mt-1">Daily loss exposure</span>
           </div>
@@ -221,7 +341,7 @@ export default function Dashboard() {
             <Card className="flex flex-col h-full">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290]">Watchlist</h2>
-                <Badge variant="default">23 instruments</Badge>
+                <Badge variant="default">{watchlist.length} instruments</Badge>
               </div>
               <div className="overflow-hidden max-h-[220px]">
                 <table className="data-table">
@@ -234,16 +354,24 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {WATCHLIST.map((w) => (
-                      <tr key={w.sym} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
-                        <td className="py-1.5 font-mono">{w.sym}</td>
-                        <td className="py-1.5 text-right font-mono">${w.px.toFixed(2)}</td>
-                        <td className={`py-1.5 text-right font-mono ${w.ch >= 0 ? "text-[#00ff00]" : "text-[#ff0000]"}`}>
-                          {w.ch >= 0 ? "+" : ""}${w.ch.toFixed(2)}
+                    {(loading.positions || loading.signals) && watchlist.length === 0 ? (
+                      <tr key="loading">
+                        <td colSpan={4} className="py-1.5 text-[10px] text-[#7c8290]">
+                          Loading watchlist...
                         </td>
-                        <td className="py-1.5 text-right text-xs text-[#7c8290]">{w.reg}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      watchlist.map((w) => (
+                        <tr key={w.sym} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
+                          <td className="py-1.5 font-mono">{w.sym}</td>
+                          <td className="py-1.5 text-right font-mono">${w.px.toFixed(2)}</td>
+                          <td className={`py-1.5 text-right font-mono ${w.reg === "Bull" ? "text-[#00ff00]" : w.reg === "Bear" ? "text-[#ff0000]" : "text-[#7c8290]"}`}>
+                            {w.ch >= 0 ? "+" : ""}${w.ch.toFixed(2)}
+                          </td>
+                          <td className="py-1.5 text-right text-xs text-[#7c8290]">{w.reg}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -254,7 +382,7 @@ export default function Dashboard() {
             <Card className="flex flex-col h-full">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290]">Open Positions</h2>
-                <Badge variant="default">{MOCK_POSITIONS.filter((p) => p.side !== "Pending").length} open</Badge>
+                <Badge variant="default">{openPositions} open</Badge>
               </div>
               <div className="overflow-hidden flex-1 min-h-0">
                 <table className="data-table">
@@ -270,23 +398,31 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_POSITIONS.map((p) => (
-                      <tr key={p.symbol} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a] group">
-                        <td className="py-1.5 font-mono">{p.symbol}</td>
-                        <td className="py-1.5">
-                          <Badge variant={p.side === "Long" ? "success" : p.side === "Short" ? "danger" : "default"}>
-                            {p.side}
-                          </Badge>
+                    {loading.positions && displayPositions.length === 0 ? (
+                      <tr key="loading">
+                        <td colSpan={7} className="py-1.5 text-[10px] text-[#7c8290]">
+                          Loading positions...
                         </td>
-                        <td className="py-1.5 text-right font-mono">{p.entry ? `$${p.entry.toFixed(2)}` : "—"}</td>
-                        <td className="py-1.5 text-right font-mono">{p.stop ? `$${p.stop.toFixed(2)}` : "—"}</td>
-                        <td className="py-1.5 text-right font-mono">{p.target ? `$${p.target.toFixed(2)}` : "—"}</td>
-                        <td className={`py-1.5 text-right font-mono ${p.unrealized_pnl > 0 ? "text-[#00ff00]" : p.unrealized_pnl < 0 ? "text-[#ff0000]" : "text-[#7c8290]"}`}>
-                          {p.unrealized_pnl > 0 ? "+" : ""}$${p.unrealized_pnl.toFixed(2)}
-                        </td>
-                        <td className="py-1.5 text-right font-mono text-[#7c8290]">{p.r_multiple}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      displayPositions.map((p) => (
+                        <tr key={p.symbol} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a] group">
+                          <td className="py-1.5 font-mono">{p.symbol}</td>
+                          <td className="py-1.5">
+                            <Badge variant={p.side === "Long" ? "success" : p.side === "Short" ? "danger" : "default"}>
+                              {p.side}
+                            </Badge>
+                          </td>
+                          <td className="py-1.5 text-right font-mono">{p.entry ? `$${p.entry.toFixed(2)}` : "—"}</td>
+                          <td className="py-1.5 text-right font-mono">{p.stop ? `$${p.stop.toFixed(2)}` : "—"}</td>
+                          <td className="py-1.5 text-right font-mono">{p.target ? `$${p.target.toFixed(2)}` : "—"}</td>
+                          <td className={`py-1.5 text-right font-mono ${p.unrealized_pnl > 0 ? "text-[#00ff00]" : p.unrealized_pnl < 0 ? "text-[#ff0000]" : "text-[#7c8290]"}`}>
+                            {p.unrealized_pnl > 0 ? "+" : ""}$${p.unrealized_pnl.toFixed(2)}
+                          </td>
+                          <td className="py-1.5 text-right font-mono text-[#7c8290]">{p.r_multiple}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -295,13 +431,25 @@ export default function Dashboard() {
             <Card>
               <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290] mb-2">Signal Pipeline</h2>
               <div className="flex gap-2">
-                {[ "Scanner", "Signal", "Risk", "Exec", "Ops" ].map((stage, i) => (
-                  <div key={stage} className="pipeline-stage">
-                    <div className="pipeline-stage-name">{stage}</div>
-                    <div className="pipeline-stage-count">{i === 0 ? "4" : i === 1 ? "6" : i === 2 ? "3" : i === 3 ? "2" : "2"}</div>
-                    {i < 4 && <div className="pipeline-arrow">→</div>}
+                {loading.agents ? (
+                  <div className="pipeline-stage">
+                    <div className="pipeline-stage-name">Loading…</div>
+                    <div className="pipeline-stage-count">—</div>
                   </div>
-                ))}
+                ) : (
+                  Object.entries(agents ?? {}).map(([key, agent]) => (
+                    <div key={key} className="pipeline-stage">
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${agent.status === "online" ? "bg-[#00ff00]" : "bg-[#ff0000]"}`}
+                        ></span>
+                        <div className="pipeline-stage-name">{stageLabels[key] ?? key}</div>
+                      </div>
+                      <div className="pipeline-stage-count">{agent.errors.length}</div>
+                      {key !== "ops" && <div className="pipeline-arrow">→</div>}
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
           </div>
@@ -310,22 +458,48 @@ export default function Dashboard() {
             <Card>
               <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290] mb-2">Risk Heatmap</h2>
               <div className="space-y-2">
-                {[ { sector: "Technology", exposure: 34, limit: 50 }, { sector: "Healthcare", exposure: 12, limit: 50 }, { sector: "Financials", exposure: 8, limit: 50 } ].map((s) => (
-                  <div key={s.sector} className="text-xs">
-                    <div className="flex justify-between mb-1">
-                      <span>{s.sector}</span>
-                      <span className="font-mono">{s.exposure}%</span>
+                {risk ? (
+                  Object.entries(risk.sector_exposure).map(([sector, exposure]) => (
+                    <div key={sector} className="text-xs">
+                      <div className="flex justify-between mb-1">
+                        <span>{sector}</span>
+                        <span className="font-mono">{exposure}%</span>
+                      </div>
+                      <div className="risk-bar">
+                        <div
+                          className={`risk-fill ${exposure > 50 ? "bg-[#ff0000]" : "bg-[#ffff00]"}`}
+                          style={{ width: `${Math.min((exposure / 50) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-[#7c8290] block mt-0.5">Limit 50%</span>
                     </div>
-                    <div className="risk-bar">
-                      <div className={`risk-fill ${s.exposure > s.limit ? "bg-[#ff0000]" : "bg-[#ffff00]"}`} style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }} />
-                    </div>
-                    <span className="text-[10px] text-[#7c8290] block mt-0.5">Limit {s.limit}%</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  loading.risk ? (
+                    <div className="text-[10px] text-[#7c8290]">Loading risk data…</div>
+                  ) : (
+                    [
+                      { sector: "Technology", exposure: 34, limit: 50 },
+                      { sector: "Healthcare", exposure: 12, limit: 50 },
+                      { sector: "Financials", exposure: 8, limit: 50 },
+                    ].map((s) => (
+                      <div key={s.sector} className="text-xs">
+                        <div className="flex justify-between mb-1">
+                          <span>{s.sector}</span>
+                          <span className="font-mono">{s.exposure}%</span>
+                        </div>
+                        <div className="risk-bar">
+                          <div className={`risk-fill ${s.exposure > s.limit ? "bg-[#ff0000]" : "bg-[#ffff00]"}`} style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }} />
+                        </div>
+                        <span className="text-[10px] text-[#7c8290] block mt-0.5">Limit {s.limit}%</span>
+                      </div>
+                    ))
+                  )
+                )}
                 <div className="border-t border-[#1a1a1a] pt-2 mt-2">
                   <div className="flex justify-between text-[10px] text-[#7c8290]">
                     <span>Daily Loss Left</span>
-                    <span className="font-mono">$1,850</span>
+                    <span className="font-mono">{risk ? `$${Math.max(0, risk.daily_loss_limit - risk.daily_loss_percent).toFixed(0)}` : "$1,850"}</span>
                   </div>
                 </div>
               </div>
@@ -334,23 +508,31 @@ export default function Dashboard() {
             <Card className="flex-1 min-h-[200px]">
               <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290] mb-2">Pending Signals</h2>
               <div className="space-y-2">
-                {MOCK_SIGNALS.map((s) => (
-                  <div key={s.symbol} className="p-2 rounded-[4px] border border-[#1a1a1a] bg-[#0a0a0a]/30">
-                    <div className="flex justify-between mb-1">
-                      <span className="font-mono text-xs">{s.symbol}</span>
-                      <Badge variant="default">{s.setup_type.replace(/_/g, " ").toUpperCase()}</Badge>
+                {loading.signals && displaySignals.length === 0 ? (
+                  <div className="text-[10px] text-[#7c8290]">Loading signals…</div>
+                ) : (
+                  displaySignals.map((s) => (
+                    <div key={s.symbol} className="p-2 rounded-[4px] border border-[#1a1a1a] bg-[#0a0a0a]/30">
+                      <div className="flex justify-between mb-1">
+                        <span className="font-mono text-xs">{s.symbol}</span>
+                        <Badge variant="default">{s.setup_type.replace(/_/g, " ").toUpperCase()}</Badge>
+                      </div>
+                      <div className="flex justify-between text-xs text-[#7c8290] mb-1">
+                        <span>{s.direction}</span>
+                        <span className="font-mono">RR {s.rr_ratio}</span>
+                        <span className="font-mono">Conf {Math.round(s.confidence * 100)}%</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" onClick={() => {}}>
+                          Approve
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => {}}>
+                          Reject
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs text-[#7c8290] mb-1">
-                      <span>{s.direction}</span>
-                      <span className="font-mono">RR {s.rr_ratio}</span>
-                      <span className="font-mono">Conf {Math.round(s.confidence * 100)}%</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => {}}>Approve</Button>
-                      <Button variant="outline" size="sm" onClick={() => {}}>Reject</Button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </Card>
           </div>
