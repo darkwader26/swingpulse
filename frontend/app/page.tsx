@@ -2,8 +2,28 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+} from "recharts"
+
+const GOOGLE_CLIENT_ID =
+  "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com" // Configure the real value in Google Cloud Console
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://swingpulse-api-1.onrender.com/api/v1/"
+
+function getRedirectUri() {
+  if (typeof window === "undefined") return ""
+  return `${window.location.origin}/auth/callback`
+}
 
 interface Position {
   symbol: string
@@ -51,6 +71,14 @@ interface Risk {
   kill_switch: boolean
 }
 
+interface LogEntry {
+  id: string
+  timestamp: string
+  agent_name: string
+  event_type: string
+  message: string
+}
+
 const MOCK_POSITIONS: Position[] = [
   { symbol: "AAPL", side: "Long", entry: 189.50, stop: 184.20, target: 196.80, qty: 145, unrealized_pnl: 442.00, r_multiple: "+0.83 R", age: "2d 4h" },
   { symbol: "NVDA", side: "Long", entry: 872.00, stop: 845.00, target: 908.00, qty: 45, unrealized_pnl: 315.00, r_multiple: "+0.60 R", age: "1d 12h" },
@@ -76,6 +104,173 @@ const MOCK_WATCHLIST = [
   { sym: "SLV", px: 28.90, ch: +0.45, reg: "Neutral" },
 ]
 
+// Mock equity curve: 30 points starting at 100000, walking forward with small random
+// variations, ending near ~101240. Seeded deterministically so the line is stable.
+const MOCK_EQUITY: { time: string; equity: number }[] = (() => {
+  const points: { time: string; equity: number }[] = []
+  let equity = 100000
+  let seed = 12345
+  const next = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    return (seed / 0x7fffffff) * 2 - 1 // [-1, 1]
+  }
+  const base = new Date(Date.UTC(2026, 0, 1))
+  for (let i = 0; i < 30; i++) {
+    if (i > 0) equity += 250 + next() * 600
+    const d = new Date(base)
+    d.setUTCDate(base.getUTCDate() + i)
+    points.push({ time: d.toISOString().slice(0, 10), equity })
+  }
+  return points
+})()
+
+// Daily P&L for the last 7 days - mix of positive and negative.
+const MOCK_DAILY_PNL: { day: string; pnl: number }[] = [
+  { day: "Mon", pnl: +240 },
+  { day: "Tue", pnl: -150 },
+  { day: "Wed", pnl: +320 },
+  { day: "Thu", pnl: -80 },
+  { day: "Fri", pnl: +410 },
+  { day: "Sat", pnl: -200 },
+  { day: "Sun", pnl: +180 },
+]
+
+// Regime history: 30 points, bull=1 / bear=-1 / chop=0.
+const MOCK_REGIME: { time: string; regime: number }[] = (() => {
+  const points: { time: string; regime: number }[] = []
+  const base = new Date(Date.UTC(2026, 0, 1))
+  const pattern = [1, 1, 1, 1, 0, 0, -1, -1, 1, 1, 0, -1, -1, -1, 0]
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(base)
+    d.setUTCDate(base.getUTCDate() + i)
+    points.push({ time: d.toISOString().slice(0, 10), regime: pattern[i % pattern.length] })
+  }
+  return points
+})()
+
+const CHART_TITLE_STYLE = "text-[10px] uppercase tracking-wider text-[#7c8290] font-mono mb-1"
+
+function EquityCurve() {
+  return (
+    <Card className="flex-1 min-h-[260px]">
+      <h2 className={CHART_TITLE_STYLE}>Equity Curve</h2>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={MOCK_EQUITY}>
+          <CartesianGrid stroke="#1a1a1a" />
+          <XAxis
+            dataKey="time"
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `$${Math.round(v).toLocaleString()}`}
+          />
+          <Tooltip
+            content={({ active, payload }: any) => {
+              if (active && payload && payload.length) {
+                const { value } = payload[0]
+                return (
+                  <div className="bg-[#0a0a0a] border border-[#00ff00] p-2 text-[10px] font-mono text-[#00ff00]">
+                    {value.time}: ${value.equity.toLocaleString()}
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <Line type="monotone" dataKey="equity" stroke="#00ff00" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </Card>
+  )
+}
+
+function DailyPnL() {
+  return (
+    <Card className="flex-1 min-h-[260px]">
+      <h2 className={CHART_TITLE_STYLE}>Daily P&L</h2>
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={MOCK_DAILY_PNL}>
+          <CartesianGrid stroke="#1a1a1a" />
+          <ReferenceLine x={0} stroke="#00ff00" strokeWidth={1} />
+          <XAxis
+            dataKey="day"
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `$${v}`}
+          />
+          <Tooltip
+            content={({ active, payload }: any) => {
+              if (active && payload && payload.length) {
+                const { value } = payload[0]
+                return (
+                  <div className="bg-[#0a0a0a] border border-[#00ff00] p-2 text-[10px] font-mono text-[#00ff00]">
+                    {value.day}: ${value.pnl >= 0 ? "+" : ""}${value.pnl}
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <Bar dataKey="pnl" fill="#00ff00" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </Card>
+  )
+}
+
+function RegimeHistory() {
+  return (
+    <Card className="flex-1 min-h-[260px]">
+      <h2 className={CHART_TITLE_STYLE}>Regime History</h2>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={MOCK_REGIME}>
+          <CartesianGrid stroke="#1a1a1a" />
+          <ReferenceLine y={0} stroke="#7c8290" strokeWidth={1} strokeDasharray="2 2" />
+          <XAxis
+            dataKey="time"
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            domain={[-1.5, 1.5]}
+            tick={{ fill: "#7c8290", fontSize: 10, fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => (v === 1 ? "BULL" : v === -1 ? "BEAR" : "CHOP")}
+          />
+          <Tooltip
+            content={({ active, payload }: any) => {
+              if (active && payload && payload.length) {
+                const { value } = payload[0]
+                const label = value.regime === 1 ? "BULL" : value.regime === -1 ? "BEAR" : "CHOP"
+                return (
+                  <div className="bg-[#0a0a0a] border border-[#00ff00] p-2 text-[10px] font-mono text-[#00ff00]">
+                    {value.time}: {label}
+                  </div>
+                )
+              }
+              return null
+            }}
+          />
+          <Line type="step" dataKey="regime" stroke="#00ff00" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </Card>
+  )
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" })
   if (!res.ok) throw new Error(`${path}: ${res.status}`)
@@ -84,7 +279,7 @@ async function fetchJson<T>(path: string): Promise<T> {
 
 export default function Dashboard() {
   const [loggedIn, setLoggedIn] = useState(false)
-  const [userName, setUserName] = useState("")
+  const [user, setUser] = useState<{ name: string; email: string; picture?: string } | null>(null)
   const [terminalInput, setTerminalInput] = useState("")
   const [terminalLines, setTerminalLines] = useState([
     "C:\\SWINGPULSE> SYSTEM INITIALIZED",
@@ -100,23 +295,47 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<AgentsStatus | null>(null)
   const [loading, setLoading] = useState({ positions: true, signals: true, risk: true, agents: true })
   const terminalRef = useRef<HTMLDivElement>(null)
+  const logRef = useRef<HTMLDivElement>(null)
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([])
+  const [wsStatus, setWsStatus] = useState<"connecting" | "open" | "closed">("closed")
+  const wsUrl = "wss://swingpulse-api-1.onrender.com/ws/events"
 
   const handleGoogleLogin = () => {
-    setLoggedIn(true)
-    setUserName("Trader_01")
-    setTerminalLines((prev) => [
-      ...prev,
-      "C:\\SWINGPULSE> AUTHENTICATING VIA GOOGLE OAUTH2...",
-      "C:\\SWINGPULSE> TOKEN ACQUIRED",
-      "C:\\SWINGPULSE> USER LOGGED IN: Trader_01",
-    ])
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: getRedirectUri(),
+      response_type: "code",
+      scope: "openid email profile",
+      access_type: "offline",
+      prompt: "consent",
+    })
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
   }
 
   const handleLogout = () => {
+    localStorage.removeItem("swingpulse_token")
+    localStorage.removeItem("swingpulse_user")
     setLoggedIn(false)
-    setUserName("")
+    setUser(null)
     setKillSwitch(false)
+    setTerminalLines((prev) => [
+      ...prev,
+      "C:\\SWINGPULSE> USER LOGGED OUT",
+    ])
   }
+
+  useEffect(() => {
+    const token = localStorage.getItem("swingpulse_token")
+    const userJson = localStorage.getItem("swingpulse_user")
+    if (token && userJson) {
+      try {
+        setUser(JSON.parse(userJson))
+        setLoggedIn(true)
+      } catch {
+        // Ignore malformed stored user
+      }
+    }
+  }, [])
 
   const handleToggleKillSwitch = () => {
     setKillSwitch((prev) => {
@@ -142,6 +361,12 @@ export default function Dashboard() {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
   }, [terminalLines])
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight
+    }
+  }, [logEntries])
 
   useEffect(() => {
     let mounted = true
@@ -190,6 +415,82 @@ export default function Dashboard() {
     loadData()
     return () => {
       mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    let ws: WebSocket | null = null
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 5
+    const reconnectDelayMs = 3000
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    function connect() {
+      if (!mounted) return
+      setWsStatus("connecting")
+      try {
+        ws = new WebSocket(wsUrl)
+      } catch (err) {
+        console.error("SwingPulse: failed to create WebSocket", err)
+        scheduleReconnect()
+        return
+      }
+
+      ws.onopen = () => {
+        if (!mounted) return
+        setWsStatus("open")
+        reconnectAttempts = 0
+      }
+
+      ws.onmessage = (event: MessageEvent) => {
+        if (!mounted) return
+        try {
+          const data = JSON.parse(event.data)
+          const entry: LogEntry = {
+            id: data.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            timestamp: data.timestamp ?? new Date().toLocaleTimeString("en-US", { hour12: false }),
+            agent_name: data.agent_name ?? "Unknown",
+            event_type: data.event_type ?? "event",
+            message: data.message ?? data.payload ?? JSON.stringify(data),
+          }
+          setLogEntries((prev) => [entry, ...prev].slice(0, 200))
+        } catch (err) {
+          console.error("SwingPulse: failed to parse WebSocket message", err)
+        }
+      }
+
+      ws.onerror = (err: Event) => {
+        if (!mounted) return
+        console.error("SwingPulse: WebSocket error", err)
+        ws?.close()
+      }
+
+      ws.onclose = () => {
+        if (!mounted) return
+        setWsStatus("closed")
+        if (reconnectAttempts < maxReconnectAttempts) {
+          scheduleReconnect()
+        }
+      }
+    }
+
+    function scheduleReconnect() {
+      if (!mounted) return
+      reconnectAttempts += 1
+      setWsStatus("connecting")
+      reconnectTimer = setTimeout(() => {
+        if (!mounted) return
+        connect()
+      }, reconnectDelayMs)
+    }
+
+    connect()
+
+    return () => {
+      mounted = false
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      ws?.close()
     }
   }, [])
 
@@ -273,11 +574,25 @@ export default function Dashboard() {
               <span className="text-[10px] uppercase tracking-wider mt-0.5">Desk Terminal v0.2.0</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 border-l border-[#00ff00]/30 pl-4 ml-3">
+          <div className="flex items-center gap-4 border-l border-[#00ff00]/30 pl-4 ml-3">
             <div className="flex flex-col items-end">
-              <span className="text-xs font-mono text-[#7c8290]">{timeStr}</span>
-              <span className="text-[10px] text-[#7c8290] uppercase tracking-wider">UTC</span>
+              {user ? (
+                <>
+                  <span className="text-xs font-mono text-[#00ff00]">{user.name}</span>
+                  <span className="text-[9px] text-[#7c8290] uppercase tracking-wider">{user.email}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-mono text-[#7c8290]">{timeStr}</span>
+                  <span className="text-[10px] text-[#7c8290] uppercase tracking-wider">UTC</span>
+                </>
+              )}
             </div>
+            {user && (
+              <Button onClick={handleLogout} variant="outline" className="px-2 py-1 text-xs border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-[#000000]">
+                LOGOUT
+              </Button>
+            )}
           </div>
         </div>
 
@@ -333,6 +648,13 @@ export default function Dashboard() {
             <span className="text-xs text-[#7c8290] font-mono">Long &amp; Short Enabled</span>
           </div>
         </Card>
+      </div>
+
+      {/* Charts section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <EquityCurve />
+        <DailyPnL />
+        <RegimeHistory />
       </div>
 
       <div className="flex-1 flex flex-col gap-3 p-3 overflow-hidden">
@@ -542,37 +864,27 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] uppercase tracking-wider text-[#7c8290]">Agent Decision Log</h2>
                 <div className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full bg-[#00ff00]`} />
-                  <span className="text-[10px] text-[#7c8290]">Live feed</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === "open" ? "bg-[#00ff00]" : wsStatus === "closed" ? "bg-[#ff0000]" : "bg-[#ffff00]"}`} />
+                  <span className={`text-[10px] text-[#7c8290] font-mono`}>
+                    {wsStatus === "open" ? "Live" : wsStatus === "closed" ? "Disconnected" : "Connecting…"}
+                  </span>
                 </div>
               </div>
-              <div className="h-[200px] overflow-y-auto font-mono text-[10px]">
+              <div className="h-[200px] overflow-y-auto font-mono text-[10px]" ref={logRef}>
                 <div className="space-y-1">
-                  <div className="log-entry">
-                    <span className="log-time">[09:30:01]</span>
-                    <span className="log-agent">Scanner</span>
-                    <span className="log-msg">Market regime detected: BULL — 23 instruments passed filters</span>
-                  </div>
-                  <div className="log-entry">
-                    <span className="log-time">[09:30:02]</span>
-                    <span className="log-agent">Signal Gen</span>
-                    <span className="log-msg">4 swing signals generated (2 long, 2 short candidates)</span>
-                  </div>
-                  <div className="log-entry">
-                    <span className="log-time">[09:30:03]</span>
-                    <span className="log-agent">Risk Mgmt</span>
-                    <span className="log-msg">3 approved, 1 rejected (sector limit)</span>
-                  </div>
-                  <div className="log-entry">
-                    <span className="log-time">[09:30:04]</span>
-                    <span className="log-agent">Execution</span>
-                    <span className="log-msg">2 paper fills executed (AAPL, NVDA)</span>
-                  </div>
-                  <div className="log-entry">
-                    <span className="log-time">[09:30:05]</span>
-                    <span className="log-agent">Ops</span>
-                    <span className="log-msg">Equity $101,240.50 · Unrealized P&L +$757.00</span>
-                  </div>
+                  {logEntries.length === 0 ? (
+                    <div className="log-entry text-[#7c8290]">
+                      Waiting for agent events…
+                    </div>
+                  ) : (
+                    logEntries.map((entry) => (
+                      <div key={entry.id} className="log-entry">
+                        <span className="log-time">[{entry.timestamp}]</span>
+                        <span className="log-agent">{entry.agent_name}</span>
+                        <span className="log-msg">{entry.event_type} — {entry.message}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </Card>

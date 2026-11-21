@@ -1,8 +1,8 @@
 """FastAPI application entrypoint."""
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import asyncio, json, os
+import asyncio, json, os, httpx
 
 from database import engine, Base
 
@@ -47,6 +47,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+
+@app.post("/api/v1/auth/google/callback")
+async def google_auth_callback(payload: dict):
+    """Exchange an OAuth2 authorization code for tokens and user profile."""
+    code = payload.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+
+    async with httpx.AsyncClient() as client:
+        # Exchange the authorization code for an access token
+        token_res = await client.post(
+            GOOGLE_TOKEN_ENDPOINT,
+            data={
+                "code": code,
+                "client_id": client_id,
+                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        if not token_res.is_success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to exchange code for token: {token_res.text}",
+            )
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail="No access token in response")
+
+        # Fetch the user's profile from Google
+        user_res = await client.get(
+            GOOGLE_USERINFO_ENDPOINT,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if not user_res.is_success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to fetch user profile: {user_res.text}",
+            )
+        user_info = user_res.json()
+
+    return {
+        "access_token": access_token,
+        "user": {
+            "email": user_info.get("email"),
+            "name": user_info.get("name"),
+            "picture": user_info.get("picture"),
+        },
+    }
 
 
 @app.get("/api/v1/health")
