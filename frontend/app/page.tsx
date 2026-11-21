@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Clock, DollarSign, Activity, ShieldAlert, MoreHorizontal, Play, StopCircle } from "lucide-react"
 import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -225,7 +224,7 @@ export default function Dashboard() {
             <Card className="card-hover flex flex-col h-full">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[10px] uppercase tracking-wider text-muted">Open Positions</h2>
-                <Badge variant="default">{positions.filter(p => p.side !== "Pending").length} open</Badge>
+                <Badge variant="default">{positions.filter((p) => p.side !== "Pending").length} open</Badge>
               </div>
               <div className="overflow-hidden flex-1 min-h-0">
                 <table className="data-table">
@@ -298,10 +297,7 @@ export default function Dashboard() {
                       <span className="font-mono">{s.exposure}%</span>
                     </div>
                     <div className="risk-bar">
-                      <div
-                        className={`risk-fill ${s.exposure > s.limit ? "bg-danger" : "bg-accent"}`}
-                        style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }}
-                      />
+                      <div className={`risk-fill ${s.exposure > s.limit ? "bg-danger" : "bg-accent"}`} style={{ width: `${Math.min((s.exposure / s.limit) * 100, 100)}%` }} />
                     </div>
                     <span className="text-[10px] text-muted block mt-0.5">Limit {s.limit}%</span>
                   </div>
