@@ -54,6 +54,7 @@ out/
 
 # SwingPulse specific
 seeded_market_data.json
+live_market_data.json
 *.db
 *.sqlite
 
