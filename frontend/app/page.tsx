@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 
 const WATCHLIST = [
   { sym: "AAPL", px: 189.50, ch: +1.24 },
@@ -8,7 +8,6 @@ const WATCHLIST = [
   { sym: "MSFT", px: 418.30, ch: -0.45 },
   { sym: "AMD", px: 145.20, ch: +0.88 },
   { sym: "TLT", px: 92.40, ch: -1.10 },
-  { sym: "GLD", px: 231.50, ch: +0.32 },
 ]
 
 const PIPELINE = [
@@ -30,7 +29,6 @@ export default function Dashboard() {
     "C:\\SWINGPULSE> AGENT PIPELINE READY",
     "C:\\SWINGPULSE> AWAITING USER LOGON",
   ])
-  const terminalRef = useRef(null)
 
   const handleGoogleLogin = () => {
     setLoggedIn(true)
@@ -57,36 +55,27 @@ export default function Dashboard() {
     }, 500)
   }
 
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
-    }
-  }, [terminalLines])
-
   if (!loggedIn) {
     return (
-      <div className="h-full flex flex-col bg-[#000000] text-[#00ff00] font-mono">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center p-8 border-4 border-[#00ff00] bg-[#0a0a0a] rounded-lg shadow-[0_0_20px_rgba(0,255,0,0.3)]">
-            <div className="mb-6">
-              <div className="text-4xl font-bold mb-2">SWINGPULSE</div>
-              <div className="text-[#ffff00] text-sm">AGENT-PIPELINE SWING TRADING DESK</div>
-              <div className="text-[#7c8290] text-xs mt-2">VERSION 1.0.0 - PAPER TRADING MODE</div>
+      <div className="h-full flex items-center justify-center bg-[#c0c0c0] font-[\"Courier_New\"] text-black">
+        <div className="p-4 border-2 border-[#808080] bg-[#c0c0c0] shadow-[4px_4px_0px_#000000] max-w-md w-full">
+          <div className="border-t-2 border-[#ffffff] border-l-2 border-[#ffffff] border-b-2 border-[#808080] border-r-2 border-[#808080] p-1 bg-[#c0c0c0]">
+            <div className="flex items-center gap-2 mb-3 bg-[#c0c0c0] px-2 py-1 border-t-1 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080]">
+              <div className="w-2 h-2 rounded bg-[#c0c0c0] border border-[#808080]"></div>
+              <span className="text-xs font-bold text-black">SWINGPULSE</span>
             </div>
-            <div className="mb-6">
-              <div className="text-[#ffff00] text-sm mb-2">SYSTEM STATUS: AWAITING AUTHENTICATION</div>
-              <div className="flex gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#ffff00] animate-pulse"></div>
-                <span className="text-[#ffff00] text-xs">GOOGLE OAUTH2 READY</span>
-              </div>
+            <h2 className="text-xl font-bold text-black mb-4">SWINGPULSE</h2>
+            <div className="text-[10px] text-[#808080] mb-6">
+              AGENT-PIPELINE SWING TRADING DESK<br />
+              VERSION 1.0.0 - PAPER TRADING MODE
             </div>
             <button
               onClick={handleGoogleLogin}
-              className="bg-[#00ff00] text-[#000000] px-8 py-3 font-bold text-lg rounded shadow-[0_0_15px_rgba(0,255,0,0.5)] hover:bg-[#33ff33] transition-colors"
+              className="w-full py-2 bg-[#c0c0c0] border-2 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080] rounded-none text-black font-bold text-sm hover:bg-[#e0e0e0] active:border-t-2 border-[#808080] active:border-l-2 border-[#808080] active:border-b-2 border-[#ffffff] active:border-r-2 border-[#ffffff] active:translate-y-1"
             >
               LOGIN WITH GOOGLE
             </button>
-            <div className="mt-4 text-xs text-[#7c8290]">
+            <div className="mt-3 text-[10px] text-[#808080]">
               SECURE OAUTH2 AUTHENTICATION REQUIRED<br />
               NO LIVE CAPITAL - PAPER TRADING ONLY
             </div>
@@ -97,52 +86,40 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#000000] text-[#00ff00] font-mono overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none z-50"
-           style={{
-             background: "linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))",
-             backgroundSize: "100% 2px, 3px 100%",
-           }}
-        ></div>
-
-      <header className="h-12 border-b border-[#00ff00] bg-[#0a0a0a] flex items-center justify-between px-4 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded bg-[#00ff00] animate-pulse"></div>
-          <span className="font-bold text-lg">SWINGPULSE DESK TERMINAL</span>
-          <span className="text-[#ffff00] text-xs ml-2">PAPER TRADING</span>
+    <div className="h-full flex flex-col bg-[#c0c0c0] font-[\"Courier_New\"] text-black overflow-hidden">
+      {/* Window title bar */}
+      <header className="h-8 border-t-2 border-[#ffffff] border-l-2 border-[#ffffff] border-b-2 border-[#808080] border-r-2 border-[#808080] bg-[#c0c0c0] flex items-center justify-between px-2 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-[#c0c0c0] border border-[#808080]"></div>
+          <span className="text-xs font-bold text-black">SWINGPULSE DESK TERMINAL</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-[#00ff00] text-sm">{userName}</span>
-          <span className="text-[#ffff00] text-xs">GOOGLE OAUTH2 ACTIVE</span>
-          <button
-            onClick={() => { setLoggedIn(false); setUserName("") }}
-            className="text-xs border border-[#ff0000] text-[#ff0000] px-2 py-1 rounded hover:bg-[#ff0000] hover:text-[#000000] transition-colors"
-          >
-            LOGOUT
-          </button>
+        <div className="flex items-center gap-1">
+          <button className="w-5 h-5 bg-[#c0c0c0] border border-[#808080] text-black text-[10px] font-bold hover:bg-[#ff0000] hover:text-white"></button>
+          <button className="w-5 h-5 bg-[#c0c0c0] border border-[#808080] text-black text-[10px] font-bold"></button>
+          <button className="w-5 h-5 bg-[#c0c0c0] border border-[#808080] text-black text-[10px] font-bold"></button>
         </div>
       </header>
 
-      <div className="flex-1 flex h-full overflow-hidden">
-        <div className="w-1/3 border-r border-[#00ff00] bg-[#050505] p-3 overflow-y-auto">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold text-[#00ff00]">C:\\SWINGPULSE\\WATCHLIST</span>
-            <span className="text-[#ffff00] text-xs">23 INSTRUMENTS</span>
+      <div className="flex-1 flex h-full overflow-hidden bg-[#c0c0c0]">
+        {/* Column 1: File Explorer / Watchlist */}
+        <div className="w-1/3 border-r-2 border-[#808080] border-t-2 border-[#ffffff] border-l-2 border-[#ffffff] border-b-2 border-[#808080] border-r-2 border-[#808080] bg-[#c0c0c0] p-1 overflow-y-auto">
+          <div className="flex items-center gap-1 mb-1 bg-[#c0c0c0] px-1 py-0.5 border-t-1 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080]">
+            <span className="text-[9px] font-bold text-black">C:\\SWINGPULSE\\WATCHLIST</span>
           </div>
           <table className="w-full text-[10px]">
             <thead>
-              <tr className="border-b border-[#00ff00]">
-                <th className="text-left pb-1 text-[#7c8290]">SYMBOL</th>
-                <th className="text-right pb-1 text-[#7c8290]">PRICE</th>
-                <th className="text-right pb-1 text-[#7c8290]">CHANGE</th>
+              <tr className="border-b-2 border-[#808080]">
+                <th className="text-left pb-1 text-[#808080] font-bold">SYMBOL</th>
+                <th className="text-right pb-1 text-[#808080] font-bold">PRICE</th>
+                <th className="text-right pb-1 text-[#808080] font-bold">CHANGE</th>
               </tr>
             </thead>
             <tbody>
               {WATCHLIST.map((w) => (
-                <tr key={w.sym} className="border-b border-[#1a1a1a] hover:bg-[#0a0a0a]">
+                <tr key={w.sym} className="border-b border-[#c0c0c0] hover:bg-[#e0e0e0]">
                   <td className="py-1 font-mono">{w.sym}</td>
                   <td className="py-1 text-right font-mono">${w.px.toFixed(2)}</td>
-                  <td className={`py-1 text-right font-mono ${w.ch >= 0 ? "text-[#00ff00]" : "text-[#ff0000]"}`}>
+                  <td className={`py-1 text-right font-mono ${w.ch >= 0 ? "text-[#008000]" : "text-[#ff0000]"}`}>
                     {w.ch >= 0 ? "+" : ""}${w.ch.toFixed(2)}
                   </td>
                 </tr>
@@ -151,14 +128,15 @@ export default function Dashboard() {
           </table>
         </div>
 
-        <div className="w-1/3 border-r border-[#00ff00] bg-[#000000] p-3 flex flex-col">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold text-[#00ff00]">C:\\SWINGPULSE\\TERMINAL</span>
+        {/* Column 2: Terminal */}
+        <div className="w-1/3 border-r-2 border-[#808080] border-t-2 border-[#ffffff] border-l-2 border-[#ffffff] border-b-2 border-[#808080] border-r-2 border-[#808080] bg-[#000000] p-1 flex flex-col">
+          <div className="flex justify-between items-center mb-1 bg-[#c0c0c0] px-1 py-0.5 border-t-1 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080]">
+            <span className="text-[9px] font-bold text-black">C:\\SWINGPULSE\\TERMINAL</span>
             <span className="text-[#ffff00] text-xs">v1.0.0</span>
           </div>
-          <div className="flex-1 overflow-y-auto bg-[#000000] p-2 border border-[#1a1a1a] rounded-sm" ref={terminalRef}>
+          <div className="flex-1 overflow-y-auto bg-[#000000] p-1 border-2 border-[#808080] rounded-none">
             {terminalLines.map((line, i) => (
-              <div key={i} className="mb-1">
+              <div key={i} className="mb-[2px]">
                 {line.includes("ERROR") || line.includes("FAIL") ? (
                   <span className="text-[#ff0000]">{line}</span>
                 ) : line.includes("APPROVED") || line.includes("ONLINE") || line.includes("READY") ? (
@@ -171,67 +149,68 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <form onSubmit={handleTerminalSubmit} className="mt-2 flex gap-2">
+          <form onSubmit={handleTerminalSubmit} className="mt-1 flex gap-1 bg-[#c0c0c0] p-1 border-t-1 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080]">
             <input
               type="text"
               value={terminalInput}
               onChange={(e) => setTerminalInput(e.target.value)}
-              className="flex-1 bg-[#000000] text-[#00ff00] border border-[#00ff00] px-2 py-1 text-sm font-mono focus:outline-none focus:border-[#ffff00]"
+              className="flex-1 bg-[#000000] text-[#00ff00] border border-[#808080] px-1 py-0.5 text-sm font-mono focus:outline-none"
               placeholder="C:\\SWINGPULSE>"
             />
             <button
               type="submit"
-              className="bg-[#00ff00] text-[#000000] px-3 py-1 font-bold text-xs rounded hover:bg-[#33ff33] transition-colors"
+              className="bg-[#c0c0c0] border-2 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080] px-2 py-0.5 text-black text-[10px] font-bold hover:bg-[#e0e0e0]"
             >
               ENTER
             </button>
           </form>
         </div>
 
-        <div className="w-1/3 bg-[#050505] p-3 overflow-y-auto">
-          <div className="mb-3">
-            <span className="text-xs font-bold text-[#00ff00]">AGENT PIPELINE</span>
-            <span className="text-[#ffff00] text-xs ml-2">SWING TRADING DESK</span>
+        {/* Column 3: Agent Pipeline */}
+        <div className="w-1/3 bg-[#c0c0c0] p-1 overflow-y-auto">
+          <div className="flex justify-between items-center mb-1 bg-[#c0c0c0] px-1 py-0.5 border-t-1 border-[#ffffff] border-l-1 border-[#ffffff] border-b-1 border-[#808080] border-r-1 border-[#808080]">
+            <span className="text-[9px] font-bold text-black">AGENT PIPELINE</span>
+            <span className="text-[#ffff00] text-xs">SWING DESK</span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {PIPELINE.map((agent, i) => (
-              <div key={agent.name} className="flex items-center gap-2 p-2 border border-[#1a1a1a] rounded-sm bg-[#0a0a0a]">
-                <div className={`w-2 h-2 rounded-full ${agent.status === "ONLINE" || agent.status === "ACTIVE" ? "bg-[#00ff00]" : agent.status === "PAPER" ? "bg-[#ffff00]" : "bg-[#ff0000]"}`}></div>
-                <span className="text-xs font-mono">{agent.name}</span>
+              <div key={agent.name} className="flex items-center gap-1 p-1 border border-[#808080] bg-[#c0c0c0] rounded-none">
+                <div className={`w-2 h-2 ${agent.status === "ONLINE" || agent.status === "ACTIVE" ? "bg-[#008000]" : agent.status === "PAPER" ? "bg-[#ffff00]" : "bg-[#ff0000]"}`}></div>
+                <span className="text-[10px] font-mono text-black">{agent.name}</span>
                 <span className="text-[#ffff00] text-xs ml-1">{agent.items}</span>
-                <span className="text-xs text-[#00ff00] ml-auto">{agent.status}</span>
-                {i < PIPELINE.length - 1 && <span className="text-[#00ff00] text-xs">→</span>}
+                <span className="text-[10px] text-[#008000] ml-auto">{agent.status}</span>
+                {i < PIPELINE.length - 1 && <span className="text-[#008000] text-xs">→</span>}
               </div>
             ))}
           </div>
-          <div className="mt-4 border border-[#00ff00] p-2 bg-[#000000]">
-            <span className="text-xs font-bold text-[#00ff00] block mb-1">SYSTEM RESOURCES</div>
-            <div className="flex justify-between text-[10px] mb-1">
-              <span>CPU</span>
-              <span className="text-right">42%</span>
+          <div className="mt-2 border border-[#808080] p-1 bg-[#c0c0c0]">
+            <span className="text-[9px] font-bold text-black block mb-1">SYSTEM RESOURCES</div>
+            <div className="flex justify-between text-[9px] mb-0.5">
+              <span className="text-black">CPU</span>
+              <span className="text-right text-black">42%</span>
             </div>
-            <div className="w-full bg-[#1a1a1a] h-1 rounded-sm overflow-hidden">
-              <div className="bg-[#00ff00] h-full" style={{ width: "42%" }}></div>
+            <div className="w-full bg-[#808080] h-1">
+              <div className="bg-[#008000] h-full" style={{ width: "42%" }}></div>
             </div>
-            <div className="flex justify-between text-[10px] mb-1">
-              <span>MEMORY</span>
-              <span className="text-right">68%</span>
+            <div className="flex justify-between text-[9px] mb-0.5">
+              <span className="text-black">MEMORY</span>
+              <span className="text-right text-black">68%</span>
             </div>
-            <div className="w-full bg-[#1a1a1a] h-1 rounded-sm overflow-hidden">
+            <div className="w-full bg-[#808080] h-1">
               <div className="bg-[#ffff00] h-full" style={{ width: "68%" }}></div>
             </div>
-            <div className="flex justify-between text-[10px]">
-              <span>NETWORK</span>
-              <span className="text-right">12%</span>
+            <div className="flex justify-between text-[9px]">
+              <span className="text-black">NETWORK</span>
+              <span className="text-right text-black">12%</span>
             </div>
-            <div className="w-full bg-[#1a1a1a] h-1 rounded-sm overflow-hidden">
-              <div className="bg-[#00ff00] h-full" style={{ width: "12%" }}></div>
+            <div className="w-full bg-[#808080] h-1">
+              <div className="bg-[#008000] h-full" style={{ width: "12%" }}></div>
             </div>
           </div>
         </div>
       </div>
 
-      <footer className="h-8 border-t border-[#00ff00] bg-[#0a0a0a] flex items-center justify-between px-4 text-[10px] text-[#7c8290] z-10">
+      <footer className="h-6 border-t-2 border-[#ffffff] border-l-2 border-[#ffffff] border-b-2 border-[#808080] border-r-2 border-[#808080] bg-[#c0c0c0] flex items-center justify-between px-2 text-[9px] text-[#808080] z-10">
         <span>SWINGPULSE v1.0.0 - PAPER TRADING MODE</span>
         <span>NO LIVE CAPITAL - NOT FINANCIAL ADVICE</span>
       </footer>
