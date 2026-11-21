@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: oklch(0.18 0 0);
+    --surface: oklch(0.235 0 0);
+    --surface-elev: oklch(0.28 0 0);
+    --border: oklch(0.32 0 0);
+    --ink: oklch(0.95 0 0);
+    --muted: oklch(0.6 0 0);
+    --accent: oklch(0.65 0.15 160);
+    --danger: oklch(0.6 0.2 25);
+    --success: oklch(0.7 0.15 150);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+  }
+
+  .font-mono {
+    font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-sm p-4;
+  }
+  .metric {
+    @apply flex flex-col gap-1;
+  }
+  .metric-value {
+    @apply text-3xl font-bold font-mono leading-none;
+  }
+  .metric-label {
+    @apply text-xs uppercase tracking-wider text-muted;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border;
+  }
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-sm text-sm font-semibold border transition-colors;
+  }
+}

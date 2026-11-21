@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwingPulse — Command Center</title>
+<style>
+  :root {
+    --bg: oklch(0.18 0 0);
+    --surface: oklch(0.235 0 0);
+    --surface-elev: oklch(0.28 0 0);
+    --border: oklch(0.32 0 0);
+    --ink: oklch(0.95 0 0);
+    --muted: oklch(0.6 0 0);
+    --accent: oklch(0.65 0.15 160);
+    --accent-short: oklch(0.65 0.18 25);
+    --danger: oklch(0.6 0.2 25);
+    --success: oklch(0.7 0.15 150);
+    --warning: oklch(0.75 0.15 60);
+    --radius: 6px;
+    --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 13px; line-height: 1.4; }
+  body { padding: 24px; }
+
+  h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: 20px; margin-bottom: 20px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .text-muted { color: var(--muted); }
+  .text-sm { font-size: 11px; }
+  .text-xs { font-size: 10px; }
+
+  /* Layout */
+  .app { display: grid; grid-template-rows: auto 1fr auto; gap: 20px; min-height: calc(100vh - 48px); }
+  .header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .brand { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .status-bar { display: flex; gap: 12px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 2px var(--bg); }
+  .dot.error { background: var(--danger); }
+  .dot.warn { background: var(--warning); }
+
+  .grid { display: grid; gap: 16px; }
+  .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-cols-12 { grid-template-columns: repeat(12, 1fr); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .card-elev { background: var(--surface-elev); }
+
+  /* Metric */
+  .metric { display: flex; flex-direction: column; gap: 4px; }
+  .metric-value { font-size: 24px; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
+  .metric-delta { font-size: 11px; font-weight: 600; }
+  .metric-delta.pos { color: var(--success); }
+  .metric-delta.neg { color: var(--danger); }
+  .metric-delta.neu { color: var(--muted); }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 6px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  td { padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: oklch(0.26 0 0); }
+
+  .pos-long { color: var(--success); }
+  .pos-short { color: var(--accent-short); }
+  .pos-flat { color: var(--muted); }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid; }
+  .badge-pending { background: oklch(0.25 0.05 60); color: var(--warning); border-color: oklch(0.35 0.05 60); }
+  .badge-approved { background: oklch(0.25 0.08 150); color: var(--success); border-color: oklch(0.35 0.08 150); }
+  .badge-rejected { background: oklch(0.25 0.1 25); color: var(--danger); border-color: oklch(0.35 0.1 25); }
+  .badge-executed { background: oklch(0.25 0.05 160); color: var(--accent); border-color: oklch(0.35 0.05 160); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius); border: 1px solid; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: inherit; }
+  .btn-primary { background: var(--accent); color: oklch(0.15 0 0); border-color: var(--accent); }
+  .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-sm { padding: 4px 8px; font-size: 10px; }
+
+  /* Kill Switch */
+  .killswitch { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: oklch(0.3 0.15 25); border: 1px solid var(--danger); border-radius: var(--radius); color: #fff; }
+  .killswitch.active { background: oklch(0.25 0.1 25); border-color: var(--muted); color: var(--muted); }
+  .killswitch-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Pipeline */
+  .pipeline { display: flex; gap: 8px; padding: 8px; background: var(--surface-elev); border: 1px solid var(--border); border-radius: var(--radius); }
+  .pipeline-stage { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: relative; }
+  .pipeline-stage-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+  .pipeline-stage-count { font-size: 18px; font-family: var(--font-mono); font-weight: 700; }
+  .pipeline-arrow { align-self: center; color: var(--muted); font-size: 10px; }
+
+  /* Scrollable */
+  .scroll { overflow-y: auto; max-height: 400px; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--surface); }
+  .scroll::-webkit-scrollbar { width: 6px; }
+  .scroll::-webkit-scrollbar-track { background: var(--surface); }
+  .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Logs */
+  .log-entry { display: flex; gap: 10px; padding: 8px; border-bottom: 1px solid oklch(0.22 0 0); font-size: 11px; font-family: var(--font-mono); }
+  .log-time { color: var(--muted); width: 60px; }
+  .log-agent { font-weight: 700; width: 90px; color: var(--accent); }
+  .log-msg { color: var(--ink); }
+  .log-json { color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-cols-12 { grid-template-columns: 1fr; }
+    .pipeline { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">SwingPulse</div>
+    <div class="status-bar">
+      <div><span class="dot"></span> <span style="font-size:12px">All agents online</span></div>
+      <div style="font-size:11px;color:var(--muted)">Paper trading mode</div>
+      <button class="btn btn-danger btn-sm" id="killSwitchBtn">⚠ Kill Switch</button>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="grid grid-cols-4">
+    <!-- Left Rail: Watchlist -->
+    <div class="grid-cols-1" style="grid-row: span 2;">
+      <div class="card">
+        <h2>Watchlist</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr>
+              <th style="width:60px">Symbol</th>
+              <th style="width:80px">Price</th>
+              <th style="width:70px">Change</th>
+              <th style="width:90px">Regime</th>
+              <th>Status</th>
+            </tr></thead>
+            <tbody id="watchlistBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Equity + Metrics -->
+    <div style="grid-column: span 3;">
+      <div class="grid grid-cols-4" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="metric">
+            <div class="metric-label">Today P&L</div>
+            <div class="metric-value mono" id="todayPL">+$1,240.50</div>
+            <div class="metric-delta pos">+1.24%</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="metric">
+            <div class="metric-label">Win Rate</div>
+            <div class="metric-value mono" id="winRate">62%</div>
+            <div class="metric-delta neu">Last 50 trades</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="metric">
+            <div class="metric-label">Open Positions</div>
+            <div class="metric-value mono" id="openPos">4</div>
+            <div class="metric-delta neu">Max 8</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="metric">
+            <div class="metric-label">Daily Risk Left</div>
+            <div class="metric-value mono" id="riskLeft">$1,850</div>
+            <div class="metric-delta neu">Limit: $2,000</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equity Curve -->
+      <div class="card" style="grid-column: span 3;">
+        <h2>Equity Curve</h2>
+        <div style="height:200px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-family:var(--font-mono);">Canvas equity curve renders here (Chart.js / Recharts)</div>
+      </div>
+
+      <!-- Risk Heatmap -->
+      <div class="card">
+        <h2>Risk Heatmap</h2>
+        <table>
+          <thead><tr>
+            <th>Sector</th>
+            <th style="width:100px">Exposure</th>
+            <th style="width:120px">Correlation</th>
+            <th style="width:100px">Limit</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>Technology</td><td class="mono">34%</td><td class="mono">0.72</td><td class="text-muted">Max 50%</td></tr>
+            <tr><td>Healthcare</td><td class="mono">12%</td><td class="mono">0.31</td><td class="text-muted">Max 50%</td></tr>
+            <tr><td>Financials</td><td class="mono">8%</td><td class="mono">0.44</td><td class="text-muted">Max 50%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Open Positions -->
+      <div class="card" style="grid-column: span 3;">
+        <h2>Open Positions</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr>
+              <th style="width:70px">Symbol</th>
+              <th style="width:70px">Side</th>
+              <th style="width:100px">Entry</th>
+              <th style="width:100px">Stop</th>
+              <th style="width:100px">Target</th>
+              <th style="width:90px">Qty</th>
+              <th style="width:100px">Unrealized P&L</th>
+              <th style="width:120px">R-Multiple</th>
+              <th>Age</th>
+            </tr></thead>
+            <tbody id="positionsBody">
+              <tr>
+                <td class="mono">AAPL</td>
+                <td><span class="badge badge-approved">Long</span></td>
+                <td class="mono">$189.50</td>
+                <td class="mono">$184.20</td>
+                <td class="mono">$196.80</td>
+                <td class="mono">340</td>
+                <td class="pos-long mono">+$442.00</td>
+                <td class="mono">+0.83 R</td>
+                <td class="text-muted">2d 4h</td>
+              </tr>
+              <tr>
+                <td class="mono">NVDA</td>
+                <td><span class="badge badge-approved">Long</span></td>
+                <td class="mono">$872.00</td>
+                <td class="mono">$845.00</td>
+                <td class="mono">$915.00</td>
+                <td class="mono">45</td>
+                <td class="pos-long mono">+$315.00</td>
+                <td class="mono">+0.60 R</td>
+                <td class="text-muted">1d 12h</td>
+              </tr>
+              <tr>
+                <td class="mono">TLT</td>
+                <td><span class="badge badge-approved">Short</span></td>
+                <td class="mono">$92.40</td>
+                <td class="mono">$94.10</td>
+                <td class="mono">$89.00</td>
+                <td class="mono">210</td>
+                <td class="pos-short mono">-$178.50</td>
+                <td class="mono">-0.45 R</td>
+                <td class="text-muted">5d 2h</td>
+              </tr>
+              <tr>
+                <td class="mono">MSFT</td>
+                <td><span class="badge badge-pending">Pending</span></td>
+                <td class="mono">—</td>
+                <td class="mono">—</td>
+                <td class="mono">—</td>
+                <td class="mono">—</td>
+                <td class="text-muted">—</td>
+                <td class="text-muted">—</td>
+                <td class="text-muted">Queued</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Signal Pipeline -->
+      <div class="card">
+        <h2>Signal Pipeline</h2>
+        <div class="pipeline">
+          <div class="pipeline-stage">
+            <div class="pipeline-stage-name">1. Scanner</div>
+            <div class="pipeline-stage-count mono">42</div>
+            <div class="text-xs text-muted">Universe filtered</div>
+          </div>
+          <div class="pipeline-arrow">→</div>
+          <div class="pipeline-stage">
+            <div class="pipeline-stage-name">2. Signal Gen</div>
+            <div class="pipeline-stage-count mono">6</div>
+            <div class="text-xs text-muted">Setups detected</div>
+          </div>
+          <div class="pipeline-arrow">→</div>
+          <div class="pipeline-stage">
+            <div class="pipeline-stage-name">3. Risk Mgmt</div>
+            <div class="pipeline-stage-count mono">3</div>
+            <div class="text-xs text-muted">Approved sized</div>
+          </div>
+          <div class="pipeline-arrow">→</div>
+          <div class="pipeline-stage">
+            <div class="pipeline-stage-name">4. Execution</div>
+            <div class="pipeline-stage-count mono">2</div>
+            <div class="text-xs text-muted">Fills sent</div>
+          </div>
+          <div class="pipeline-arrow">→</div>
+          <div class="pipeline-stage">
+            <div class="pipeline-stage-name">5. Ops</div>
+            <div class="pipeline-stage-count mono">2</div>
+            <div class="text-xs text-muted">Journal closed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Rail: Agent Log -->
+    <div style="grid-row: span 2;">
+      <div class="card">
+        <h2>Agent Decision Log</h2>
+        <div class="scroll" id="agentLog">
+          <div class="log-entry">
+            <span class="log-time">09:30:01</span>
+            <span class="log-agent">Scanner</span>
+            <span class="log-msg">Regime: BULL — SPY &gt; 200 EMA</span>
+          </div>
+          <div class="log-entry">
+            <span class="log-time">09:30:15</span>
+            <span class="log-agent">Scanner</span>
+            <span class="log-msg">Watchlist: 42 instruments passed volume/ATR filter</span>
+          </div>
+          <div class="log-entry">
+            <span class="log-time">16:00:02</span>
+            <span class="log-agent">Signal Gen</span>
+            <span class="log-msg">AAPL pullback to 20 EMA — entry $189.50</span>
+          </div>
+          <div class="log-entry">
+            <span class="log-time">16:00:05</span>
+            <span class="log-agent">Risk Mgmt</span>
+            <span class="log-msg">APPROVED — 340 shares, risk $1,785 (0.89%)</span>
+          </div>
+          <div class="log-entry">
+            <span class="log-time">16:00:08</span>
+            <span class="log-agent">Execution</span>
+            <span class="log-msg">Paper fill at $189.50 — order PAP-8842</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="header" style="border-top:1px solid var(--border); border-bottom:none; padding-top:12px; font-size:11px; color:var(--muted);">
+    <div>SwingPulse v0.1.0 — Paper Trading</div>
+    <div>Agent pipeline: Scanner → Signal → Risk → Execution → Ops</div>
+    <div>Not financial advice. Swing trading involves substantial risk.</div>
+  </div>
+</div>
+
+<script>
+  // Kill switch toggle
+  const btn = document.getElementById('killSwitchBtn');
+  let active = false;
+  btn.addEventListener('click', () => {
+    active = !active;
+    btn.classList.toggle('active');
+    btn.textContent = active ? '✓ System Halted' : '⚠ Kill Switch';
+    document.querySelectorAll('.dot').forEach(d => d.classList.toggle('error', active));
+  });
+
+  // Mock data population
+  const watchlist = [
+    { sym: 'AAPL', px: 189.50, ch: +1.24, reg: 'Bull', st: 'Position Open' },
+    { sym: 'NVDA', px: 872.00, ch: +2.10, reg: 'Bull', st: 'Position Open' },
+    { sym: 'MSFT', px: 418.30, ch: -0.45, reg: 'Bull', st: 'Signal Pending' },
+    { sym: 'AMD', px: 145.20, ch: +0.88, reg: 'Bull', st: 'Scanning' },
+    { sym: 'TLT', px: 92.40, ch: -1.10, reg: 'Neutral', st: 'Position Open' },
+    { sym: 'GLD', px: 231.50, ch: +0.32, reg: 'Neutral', st: 'Scanning' },
+    { sym: 'EEM', px: 41.80, ch: -0.15, reg: 'Bear', st: 'Scanning' },
+  ];
+  const tbody = document.getElementById('watchlistBody');
+  watchlist.forEach(w => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${w.sym}</td>
+      <td class="mono">$${w.px.toFixed(2)}</td>
+      <td class="${w.ch >= 0 ? 'pos-long' : 'pos-short'} mono">${w.ch >= 0 ? '+' : ''}${w.ch.toFixed(2)}</td>
+      <td class="text-muted">${w.reg}</td>
+      <td><span class="badge badge-${w.st === 'Position Open' ? 'approved' : w.st === 'Signal Pending' ? 'pending' : 'rejected'}">${w.st}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+</script>
+</body>
+</html>
