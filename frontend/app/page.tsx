@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { MoreHorizontal, Play, Stop, Activity, ShieldAlert, Clock, DollarSign } from "lucide-react"
-import { Card, Metric, StatusDot, Badge, Button } from "@/components/ui"
+import { Card, Metric, StatusDot, Badge, Button } from "../components/ui"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
