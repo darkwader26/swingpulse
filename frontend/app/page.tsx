@@ -1,5 +1,6 @@
 'use client'
 
+// BUILD v2-trading-terminal - redeploy forced
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AgentLog } from '../components/AgentLog'
 import { EmptyState } from '../components/EmptyState'
