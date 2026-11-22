@@ -404,8 +404,12 @@ async def market_data_bulk(payload: dict):
                     session.add(inst)
                     await session.commit()
                     await session.refresh(inst)
+                ts = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+                # MarketData.time is TIMESTAMP WITHOUT TIME ZONE — strip tz
+                if ts.tzinfo is not None:
+                    ts = ts.replace(tzinfo=None)
                 session.add(MarketData(
-                    time=datetime.fromisoformat(time_str.replace("Z", "+00:00")),
+                    time=ts,
                     symbol=symbol,
                     open=float(row.get("open", 0) or 0),
                     high=float(row.get("high", 0) or 0),
