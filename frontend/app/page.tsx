@@ -15,62 +15,14 @@ import type { AgentEvent, AgentStatus, Position, Risk, Signal } from '../compone
 const PROXY_BASE = '/api/proxy'
 
 const MOCK_POSITIONS: Position[] = [
-  {
-    symbol: 'AAPL',
-    side: 'long',
-    entry: 189.5,
-    stop: 184.2,
-    target: 196.8,
-    qty: 340,
-    unrealized_pnl: 442.0,
-    r_multiple: 0.83,
-    age: '2d 4h',
-  },
-  {
-    symbol: 'NVDA',
-    side: 'long',
-    entry: 872.0,
-    stop: 845.0,
-    target: 915.0,
-    qty: 45,
-    unrealized_pnl: 315.0,
-    r_multiple: 0.6,
-    age: '1d 12h',
-  },
-  {
-    symbol: 'TLT',
-    side: 'short',
-    entry: 92.4,
-    stop: 94.1,
-    target: 89.0,
-    qty: 210,
-    unrealized_pnl: -178.5,
-    r_multiple: -0.45,
-    age: '5d 2h',
-  },
+  { symbol: 'AAPL', side: 'long', entry: 189.5, stop: 184.2, target: 196.8, qty: 340, unrealized_pnl: 442.0, r_multiple: 0.83, age: '2d 4h' },
+  { symbol: 'NVDA', side: 'long', entry: 872.0, stop: 845.0, target: 915.0, qty: 45, unrealized_pnl: 315.0, r_multiple: 0.6, age: '1d 12h' },
+  { symbol: 'TLT', side: 'short', entry: 92.4, stop: 94.1, target: 89.0, qty: 210, unrealized_pnl: -178.5, r_multiple: -0.45, age: '5d 2h' },
 ]
 
 const MOCK_SIGNALS: Signal[] = [
-  {
-    symbol: 'MSFT',
-    setup_type: 'Pullback to EMA',
-    direction: 'long',
-    entry_price: 418.3,
-    stop_price: 409.0,
-    target_1: 435.0,
-    rr_ratio: 1.87,
-    confidence: 82,
-  },
-  {
-    symbol: 'AMD',
-    setup_type: 'Breakout',
-    direction: 'long',
-    entry_price: 145.2,
-    stop_price: 140.5,
-    target_1: 154.0,
-    rr_ratio: 1.69,
-    confidence: 76,
-  },
+  { symbol: 'MSFT', setup_type: 'Pullback to EMA', direction: 'long', entry_price: 418.3, stop_price: 409.0, target_1: 435.0, rr_ratio: 1.87, confidence: 82 },
+  { symbol: 'AMD', setup_type: 'Breakout', direction: 'long', entry_price: 145.2, stop_price: 140.5, target_1: 154.0, rr_ratio: 1.69, confidence: 76 },
 ]
 
 const MOCK_AGENTS: AgentStatus = {
@@ -106,7 +58,16 @@ export default function Dashboard() {
   const [events, setEvents] = useState<AgentEvent[]>(MOCK_EVENTS)
   const [loading, setLoading] = useState(true)
   const [apiOk, setApiOk] = useState(true)
+  const [time, setTime] = useState(new Date())
   const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const timeStr = time.toLocaleTimeString('en-US', { hour12: false }).padStart(8, '0')
+  const dateStr = time.toLocaleDateString('en-US', { month: 'short', day: '2-digit', weekday: 'short' }).toUpperCase()
 
   const fetchJson = useCallback(async (path: string) => {
     const res = await fetch(`${PROXY_BASE}${path}`, { cache: 'no-store' })
@@ -164,13 +125,9 @@ export default function Dashboard() {
             created_at: msg.created_at ?? new Date().toISOString(),
           }
           setEvents((prev) => [entry, ...prev].slice(0, 200))
-        } catch {
-          // ignore malformed
-        }
+        } catch { /* ignore malformed */ }
       }
-    } catch {
-      // websocket unavailable — continue with mock events
-    }
+    } catch { /* websocket unavailable — continue with mock events */ }
     return () => { socket?.close() }
   }, [])
 
@@ -186,137 +143,187 @@ export default function Dashboard() {
   })).reverse()
 
   return (
-    <div className="min-h-screen bg-bg text-ink font-sans antialiased" style={{ minHeight: '100vh' }}>
-      {/* Row 1: Header */}
-      <header className="border-b border-border pb-12 px-0">
-        <div className="max-w-7xl mx-auto grid grid-cols-12 gap-4 items-center px-4">
-          <div className="col-span-2 text-[16px] font-semibold tracking-tight">
-            SwingPulse
-          </div>
-          <div className="col-span-8 text-right">
-            <div className="flex items-center justify-end gap-4">
-              <span className="flex items-center gap-2 text-[12px]">
-                <StatusDot status="online" />
-                <span>All agents online</span>
-              </span>
-              <span className="text-xs text-muted ml-4">Paper trading mode</span>
-            </div>
-          </div>
-          <div className="col-span-2">
-            <KillSwitch initial={risk.kill_switch} />
+    <div className="min-h-screen bg-bg text-ink font-sans antialiased desktop-bg" style={{ minHeight: '100vh', position: 'relative', zIndex: 0 }}>
+      {/* CRT overlay handled in CSS ::before/::after on body */}
+
+      {/* Desktop Icons (left side) */}
+      <div className="fixed top-12 left-4 flex flex-col gap-4 z-20 pointer-events-none">
+        <a href="#" className="desktop-icon selected pointer-events-auto">
+          <div className="desktop-icon-icon">▨</div>
+          <span>COMMAND</span>
+        </a>
+        <a href="#" className="desktop-icon pointer-events-auto">
+          <div className="desktop-icon-icon">📊</div>
+          <span>MARKETS</span>
+        </a>
+        <a href="#" className="desktop-icon pointer-events-auto">
+          <div className="desktop-icon-icon">📁</div>
+          <span>LOGS</span>
+        </a>
+        <a href="#" className="desktop-icon pointer-events-auto">
+          <div className="desktop-icon-icon">⚙️</div>
+          <span>SYS</span>
+        </a>
+      </div>
+
+      {/* Main Window Frame */}
+      <div className="window max-w-[1200px] mx-auto mt-8 mb-40 h-[calc(100vh-140px)] z-10 relative" style={{ minHeight: '600px' }}>
+        <div className="window-titlebar">
+          <span>SWINGPULSE v6.0 — COMMAND CENTER</span>
+          <div className="window-controls">
+            <div className="window-control" style={{ color: '#ff5f56' }}>●</div>
+            <div className="window-control" style={{ color: '#ffbd2e' }}>●</div>
+            <div className="window-control" style={{ color: '#27c93f' }}>●</div>
           </div>
         </div>
-      </header>
+        <div className="window-body h-full flex flex-col gap-6">
 
-      <main className="max-w-7xl mx-auto px-4 py-4">
-        {/* Row 2 */}
-        <div className="grid grid-cols-12 gap-4 mb-6">
-          {/* Col1: Watchlist */}
-          <div className="col-span-3">
-            <div className="card">
-              <h2>Watchlist</h2>
-              <div className="scroll" style={{ maxHeight: 420 }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '70px' }}>Symbol</th>
-                      <th style={{ width: '90px' }}>Price</th>
-                      <th style={{ width: '80px' }}>Change</th>
-                      <th style={{ width: '80px' }}>Regime</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {positions.length > 0 ? (
-                      positions.map((p) => (
-                        <tr key={p.symbol}>
-                          <td className="mono">{p.symbol}</td>
-                          <td className="mono">${p.entry.toFixed(2)}</td>
-                          <td className={`mono ${pnlSign(p.unrealized_pnl)}`}>
-                            {p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(2)}
-                          </td>
-                          <td className="text-muted">{regime(p.symbol)}</td>
-                          <td>
-                            <span className="badge badge-approved">Position Open</span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="text-muted py-4 text-center">
-                          <EmptyState title="No watchlist data" subtitle="Unable to load symbols" />
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+          {/* Row 1: Header Bar */}
+          <header className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-[14px] font-extrabold tracking-widest text-glitch" data-text="SWINGPULSE">SWINGPULSE</span>
+                <span className="text-xs font-bold text-muted border-l border-border pl-2">PAPER TRADING</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-bold mono">
+                <StatusDot status="online" />
+                <span>AGENTS ONLINE</span>
+                <span>{dateStr} &nbsp;|&nbsp; {timeStr} UTC</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Row 2: Kill Switch + Metrics */}
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-3">
+              <KillSwitch initial={risk.kill_switch} />
+            </div>
+            <div className="col-span-3">
+              <div className="card h-full">
+                <MetricCard label="TODAY P&L" value={totalUnrealized >= 0 ? `+$${totalUnrealized.toFixed(2)}` : `-$${Math.abs(totalUnrealized).toFixed(2)}`} delta={totalUnrealized >= 0 ? `+${(totalUnrealized / 10000 * 100).toFixed(2)}%` : `-${Math.abs(totalUnrealized / 10000 * 100).toFixed(2)}%`} deltaType={totalUnrealized >= 0 ? 'pos' : 'neg'} subLabel="UNREALIZED" />
+              </div>
+            </div>
+            <div className="col-span-3">
+              <div className="card h-full">
+                <MetricCard label="WIN RATE" value={winRate} delta="LAST 50 TRADES" deltaType="neu" />
+              </div>
+            </div>
+            <div className="col-span-3">
+              <div className="card h-full">
+                <MetricCard label="OPEN POSITIONS" value={positions.length} delta={`MAX ${risk.max_positions}`} deltaType="neu" />
               </div>
             </div>
           </div>
 
-          {/* Col2: Equity + Metrics */}
-          <div className="col-span-6">
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <MetricCard
-                label="Today P&L"
-                value={`${totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}`}
-                delta={totalUnrealized >= 0 ? `+${(totalUnrealized / 10000 * 100).toFixed(2)}%` : `-${Math.abs(totalUnrealized / 10000 * 100).toFixed(2)}%`}
-                deltaType={totalUnrealized >= 0 ? 'pos' : 'neg'}
-                subLabel="Unrealized"
-              />
-              <MetricCard label="Win Rate" value={winRate} delta="Last 50 trades" deltaType="neu" />
-              <MetricCard
-                label="Open Positions"
-                value={positions.length}
-                delta={`Max ${risk.max_positions}`}
-                deltaType="neu"
-              />
-              <MetricCard
-                label="Daily Risk Left"
-                value={`$${(dailyLossLeft * 10000).toFixed(0)}`}
-                delta={`Limit: ${(risk.daily_loss_limit * 100).toFixed(0)}%`}
-                deltaType={risk.kill_switch ? 'neg' : 'neu'}
-              />
+          {/* Row 3: Watchlist + Equity + Risk */}
+          <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
+            <div className="col-span-3 min-h-0">
+              <div className="card h-full flex flex-col">
+                <h2 className="flex-shrink-0">WATCHLIST</h2>
+                <div className="flex-1 scroll min-h-0">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '70px' }}>SYMBOL</th>
+                        <th style={{ width: '80px' }}>PRICE</th>
+                        <th style={{ width: '80px' }}>P&L</th>
+                        <th style={{ width: '80px' }}>REGIME</th>
+                        <th>STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positions.length > 0 ? (
+                        positions.map((p) => (
+                          <tr key={p.symbol}>
+                            <td className="mono">{p.symbol}</td>
+                            <td className="mono">${p.entry.toFixed(2)}</td>
+                            <td className={`mono ${pnlSign(p.unrealized_pnl)}`}>{p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(2)}</td>
+                            <td className="text-muted">{regime(p.symbol)}</td>
+                            <td><span className="badge badge-approved">OPEN</span></td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="text-muted py-4 text-center">
+                            <EmptyState title="NO WATCHLIST DATA" subtitle="Unable to load symbols" />
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <EquityCurve data={equityData} />
+
+            <div className="col-span-6 min-h-0">
+              <div className="card h-full flex flex-col">
+                <h2 className="flex-shrink-0">EQUITY CURVE</h2>
+                <div className="flex-1 min-h-0 relative">
+                  <EquityCurve data={equityData} />
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-3 min-h-0">
+              <RiskHeatmap risk={risk} />
+            </div>
           </div>
 
-          {/* Col3: Risk Heatmap */}
-          <div className="col-span-3">
-            <RiskHeatmap risk={risk} />
+          {/* Row 4: Positions + Signal Pipeline */}
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-8">
+              <div className="card h-full flex flex-col">
+                <h2 className="flex-shrink-0">OPEN POSITIONS</h2>
+                <div className="flex-1 scroll min-h-0">
+                  <PositionsTable positions={positions} />
+                </div>
+              </div>
+            </div>
+            <div className="col-span-4">
+              <div className="card h-full flex flex-col">
+                <h2 className="flex-shrink-0">SIGNAL PIPELINE</h2>
+                <div className="flex-1 scroll min-h-0">
+                  <SignalQueue signals={signals} />
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Row 5: Agent Log */}
+          <div className="card h-48 flex flex-col">
+            <h2 className="flex-shrink-0">AGENT DECISION LOG</h2>
+            <div className="flex-1 scroll min-h-0">
+              <AgentLog initialEvents={events} />
+            </div>
+          </div>
+
+          {loading && (
+            <div className="mt-2 text-xs text-muted mono">LOADING DATA FROM LIVE API…</div>
+          )}
+          {!apiOk && (
+            <div className="mt-2 text-xs text-warning mono">⚠ LIVE API UNREACHABLE — SHOWING MOCK DATA</div>
+          )}
+
         </div>
+      </div>
 
-        {/* Row 3 */}
-        <div className="grid grid-cols-12 gap-4">
-          {/* Col1 empty/extends */}
-          <div className="col-span-3 hidden lg:block" />
-
-          {/* Col2: Open Positions Table */}
-          <div className="col-span-6">
-            <PositionsTable positions={positions} />
-          </div>
-
-          {/* Col3: Signal Pipeline */}
-          <div className="col-span-3">
-            <SignalQueue signals={signals} />
-          </div>
+      {/* Start Bar */}
+      <div className="start-bar z-50">
+        <div className="start-button">
+          <span>▶</span>
+          <span>START</span>
         </div>
-
-        {/* Bottom: Agent Log */}
-        <div className="mt-6">
-          <AgentLog initialEvents={events} />
+        <div className="flex-1" />
+        <div className="taskbar-item">
+          <span>📡</span>
+          <span>RENDER API</span>
         </div>
-
-        {loading && (
-          <div className="mt-4 text-xs text-muted">Loading data from live API…</div>
-        )}
-        {!apiOk && (
-          <div className="mt-4 text-xs text-warning">
-            ⚠ Live API unreachable — showing mock data.
-          </div>
-        )}
-      </main>
+        <div className="taskbar-item active">
+          <span>🖥️</span>
+          <span>VERCEL DASHBOARD</span>
+        </div>
+        <div className="taskbar-clock">{timeStr}</div>
+      </div>
     </div>
   )
 }

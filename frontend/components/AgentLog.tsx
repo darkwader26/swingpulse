@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AgentEvent } from './types'
 
 interface AgentLogProps {
@@ -62,14 +62,14 @@ export function AgentLog({ initialEvents = [], wsUrl }: AgentLogProps) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
-        <h2>Agent Decision Log</h2>
-        <span className={`text-xs font-semibold ${connected ? 'text-success' : 'text-muted'}`}>
-          {connected ? '● Live' : '● Offline'}
+        <h2>AGENT DECISION LOG</h2>
+        <span className={`text-xs font-bold mono ${connected ? 'text-success' : 'text-muted'}`}>
+          {connected ? '● LIVE' : '● OFFLINE'}
         </span>
       </div>
       <div className="scroll" style={{ maxHeight: 420 }}>
         {events.length === 0 ? (
-          <div className="text-muted p-4">No agent events yet</div>
+          <div className="text-muted p-4">NO AGENT EVENTS YET</div>
         ) : (
           events.map((e) => (
             <div key={`${e.created_at}-${e.agent_name}`} className="log-entry">
