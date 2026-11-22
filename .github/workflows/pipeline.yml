@@ -28,6 +28,53 @@ jobs:
       - name: Fetch latest market data
         run: python backend/scripts/data_feed.py --once --days 200
 
+      - name: Push market data to Render backend
+        env:
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error, os, sys
+          url = os.environ.get("RENDER_API_URL")
+          if not url:
+              print("RENDER_API_URL not set, skipping push")
+              sys.exit(0)
+          with open("backend/scripts/live_market_data.json") as f:
+              data = json.load(f)
+          bars = []
+          for symbol, records in data.items():
+              for r in records:
+                  bars.append({
+                      "symbol": symbol,
+                      "time": r.get("time"),
+                      "open": r.get("open"),
+                      "high": r.get("high"),
+                      "low": r.get("low"),
+                      "close": r.get("close"),
+                      "volume": r.get("volume", 0),
+                  })
+          if not bars:
+              print("No bars to push")
+              sys.exit(0)
+          # POST in chunks to avoid payload too large
+          chunk = 200
+          total = 0
+          for i in range(0, len(bars), chunk):
+              body = json.dumps({"bars": bars[i:i+chunk]}).encode()
+              req = urllib.request.Request(
+                  url.rstrip("/") + "/api/v1/market-data/bulk",
+                  data=body,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as resp:
+                      print(f"Pushed {len(bars[i:i+chunk])} bars: {resp.read().decode()}")
+                  total += len(bars[i:i+chunk])
+              except Exception as e:
+                  print(f"Push failed: {e}")
+          print(f"Total bars pushed: {total}")
+          PY
+
       - name: Run agent pipeline (paper trading)
         run: python backend/scripts/run_pipeline.py --equity 100000
 

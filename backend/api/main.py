@@ -285,8 +285,30 @@ async def risk():
         "open_positions": open_count,
         "max_positions": int(os.getenv("MAX_POSITIONS", "8")),
         "sector_exposure": sector_exposure,
-        "kill_switch": False,
+        "kill_switch": _KILL_SWITCH_STATE,
     }
+
+
+# ---------------------------------------------------------------------------
+# Kill switch toggle
+# ---------------------------------------------------------------------------
+_KILL_SWITCH_STATE = False
+
+@app.post("/api/v1/risk/kill-switch")
+async def kill_switch(payload: dict):
+    global _KILL_SWITCH_STATE
+    enabled = bool(payload.get("kill_switch", False))
+    _KILL_SWITCH_STATE = enabled
+    try:
+        await manager.broadcast({
+            "agent_name": "ops",
+            "event_type": "kill_switch",
+            "payload": {"kill_switch": enabled},
+            "created_at": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
+    return {"kill_switch": _KILL_SWITCH_STATE}
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +377,43 @@ async def market_data_history(
     except Exception:  # DB unavailable
         return {"symbol": symbol, "bars": []}
 
+
+# ---------------------------------------------------------------------------
+# Bulk market data ingestion (used by scheduled GitHub Actions pipeline)
+# ---------------------------------------------------------------------------
+@app.post("/api/v1/market-data/bulk")
+async def market_data_bulk(payload: dict):
+    """Receive a batch of market data bars from the scheduled data feed.
+    Stores them so the dashboard can serve live/historical data on demand.
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            bars = payload.get("bars", [])
+            count = 0
+            for row in bars:
+                symbol = row.get("symbol")
+                time_str = row.get("time")
+                if not symbol or not time_str:
+                    continue
+                inst = await session.get(Instrument, symbol)
+                if not inst:
+                    session.add(Instrument(symbol=symbol, asset_class="equity"))
+                    await session.commit()
+                    await session.refresh(inst)
+                session.add(MarketData(
+                    time=datetime.fromisoformat(time_str.replace("Z", "+00:00")),
+                    symbol=symbol,
+                    open=float(row.get("open", 0) or 0),
+                    high=float(row.get("high", 0) or 0),
+                    low=float(row.get("low", 0) or 0),
+                    close=float(row.get("close", 0) or 0),
+                    volume=int(row.get("volume", 0) or 0),
+                ))
+                count += 1
+            await session.commit()
+            return {"status": "ok", "bars_written": count}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 # ---------------------------------------------------------------------------
 # Run pipeline on demand
