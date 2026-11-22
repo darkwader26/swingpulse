@@ -105,3 +105,49 @@ class AgentEvent(Base):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     payload: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    picture: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    saved_charts = relationship("SavedChart", back_populates="user", cascade="all, delete-orphan")
+    saved_layouts = relationship("SavedLayout", back_populates="user", cascade="all, delete-orphan")
+
+
+class SavedChart(Base):
+    """A user-saved chart/layout snapshot with 1+ month of historical market data."""
+    __tablename__ = "saved_charts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    symbols: Mapped[list[str]] = mapped_column(JSONB, nullable=False)  # watchlist symbols
+    regime: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    market_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # historical bars
+    signals: Mapped[Optional[list[dict]]] = mapped_column(JSONB, nullable=True)
+    positions: Mapped[Optional[list[dict]]] = mapped_column(JSONB, nullable=True)
+    risk: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="saved_charts")
+
+
+class SavedLayout(Base):
+    """A user-saved dashboard layout configuration."""
+    __tablename__ = "saved_layouts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    layout_config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="saved_layouts")
