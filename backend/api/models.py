@@ -46,7 +46,7 @@ class Signal(Base):
     __tablename__ = "signals"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), ForeignKey("instruments.symbol"), nullable=False, index=True)
     setup_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # pullback_ema, breakout, trend_cont
     direction: Mapped[str] = mapped_column(String(10), nullable=False)  # long, short
     entry_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 4), nullable=True)
