@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic"
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://swingpulse-api-1.onrender.com/api/v1/"
+const PROXY_BASE = '/api/proxy'
 
 export default function GoogleCallback() {
   const searchParams = useSearchParams()
@@ -32,7 +32,7 @@ export default function GoogleCallback() {
       }
 
       try {
-        const res = await fetch(`${API_BASE}auth/google/callback`, {
+        const res = await fetch(`${PROXY_BASE}auth/google/callback`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code }),

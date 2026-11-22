@@ -12,7 +12,7 @@ import { SignalQueue } from '../components/SignalQueue'
 import { StatusDot } from '../components/StatusDot'
 import type { AgentEvent, AgentStatus, Position, Risk, Signal } from '../components/types'
 
-const API_BASE = 'https://swingpulse-api-1.onrender.com/api/v1'
+const PROXY_BASE = '/api/proxy'
 
 const MOCK_POSITIONS: Position[] = [
   {
@@ -109,7 +109,7 @@ export default function Dashboard() {
   const wsRef = useRef<WebSocket | null>(null)
 
   const fetchJson = useCallback(async (path: string) => {
-    const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' })
+    const res = await fetch(`${PROXY_BASE}${path}`, { cache: 'no-store' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
   }, [])
@@ -313,7 +313,7 @@ export default function Dashboard() {
         )}
         {!apiOk && (
           <div className="mt-4 text-xs text-warning">
-            ⚠ Live API unreachable — showing mock data. Check connection to {API_BASE}.
+            ⚠ Live API unreachable — showing mock data.
           </div>
         )}
       </main>

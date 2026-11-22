@@ -6,6 +6,6 @@
   "installCommand": "cd frontend && npm install",
   "outputDirectory": "frontend/.next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://swingpulse-api-1.onrender.com/api/v1"
+    "API_URL": "https://swingpulse-api-1.onrender.com/api/v1"
   }
 }
