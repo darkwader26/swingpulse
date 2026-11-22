@@ -2,12 +2,11 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
-import asyncio, json, os, httpx, uuid
+import asyncio, os, uuid, httpx
 from datetime import datetime, timedelta
 
-from database import engine, Base, AsyncSessionLocal, get_session
+from database import engine, AsyncSessionLocal, Base
 from models import (
     Instrument, MarketData, Signal, RiskDecision, Fill, AgentEvent,
     User, SavedChart, SavedLayout,
@@ -18,10 +17,16 @@ from models import (
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception:  # DB unavailable at startup — continue without it
+        pass
     yield
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="SwingPulse API", version="0.1.0", lifespan=lifespan)
@@ -42,23 +47,20 @@ GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 @app.post("/api/v1/auth/google/callback")
-async def google_auth_callback(payload: dict, session: AsyncSession = Depends(get_session)):
+async def google_auth_callback(payload: dict):
     """Exchange an OAuth2 authorization code for tokens and user profile."""
     code = payload.get("code")
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code")
-
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    client_id = os.getenv("GOOGLE_CLIENT_ID")
 
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             GOOGLE_TOKEN_ENDPOINT,
             data={
                 "code": code,
-                "client_id": client_id,
+                "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
                 "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                "redirect_uri": redirect_uri,
+                "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI", ""),
                 "grant_type": "authorization_code",
             },
         )
@@ -84,26 +86,32 @@ async def google_auth_callback(payload: dict, session: AsyncSession = Depends(ge
         user_info = user_res.json()
 
     email = user_info.get("email")
-    # Upsert user
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if not user:
-        user = User(
-            email=email,
-            name=user_info.get("name"),
-            picture=user_info.get("picture"),
-        )
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
+    user_record = None
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.email == email)
+            )
+            user_record = result.scalar_one_or_none()
+            if not user_record:
+                user_record = User(
+                    email=email,
+                    name=user_info.get("name"),
+                    picture=user_info.get("picture"),
+                )
+                session.add(user_record)
+                await session.commit()
+                await session.refresh(user_record)
+    except Exception:
+        pass  # DB unavailable — still return token
 
     return {
         "access_token": access_token,
         "user": {
-            "id": str(user.id),
-            "email": user.email,
-            "name": user.name,
-            "picture": user.picture,
+            "id": str(user_record.id) if user_record else None,
+            "email": email,
+            "name": user_info.get("name"),
+            "picture": user_info.get("picture"),
         },
     }
 
@@ -120,13 +128,14 @@ async def health():
 # Agents status
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/agents/status")
-async def agents_status(session: AsyncSession = Depends(get_session)):
+async def agents_status():
     try:
-        result = await session.execute(
-            select(AgentEvent.agent_name, func.max(AgentEvent.created_at))
-            .group_by(AgentEvent.agent_name)
-        )
-        last_runs = {name: dt for name, dt in result.all()}
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(AgentEvent.agent_name, func.max(AgentEvent.created_at))
+                .group_by(AgentEvent.agent_name)
+            )
+            last_runs = {name: dt for name, dt in result.all()}
     except Exception:  # DB unavailable
         last_runs = {}
 
@@ -164,58 +173,50 @@ async def agents_status(session: AsyncSession = Depends(get_session)):
 # Positions (from fills + latest market data)
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/positions")
-async def positions(session: AsyncSession = Depends(get_session)):
+async def positions():
     try:
-        result = await session.execute(
-            select(Fill).order_by(Fill.filled_at.desc())
-        )
-        fills = result.scalars().all()
-
-        # Group by symbol, keep latest fill as the open position
-        latest_by_symbol: dict[str, Fill] = {}
-        for f in fills:
-            if f.symbol not in latest_by_symbol:
-                latest_by_symbol[f.symbol] = f
-
-        # Get latest market data per symbol
-        md_result = await session.execute(
-            select(MarketData.symbol, func.max(MarketData.time)).group_by(MarketData.symbol)
-        )
-        latest_times = {sym: dt for sym, dt in md_result.all()}
-
-        positions = []
-        for symbol, fill in latest_by_symbol.items():
-            # Determine side from fill: buy = long, sell = short/flat
-            side = "long" if fill.side == "buy" else "short"
-            entry = float(fill.fill_price)
-            qty = float(fill.qty)
-
-            # Latest close for unrealized P&L
-            close_result = await session.execute(
-                select(MarketData.close)
-                .where(MarketData.symbol == symbol)
-                .order_by(desc(MarketData.time))
-                .limit(1)
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(Fill).order_by(Fill.filled_at.desc())
             )
-            close = close_result.scalar_one_or_none()
-            current_price = float(close) if close else entry
+            fills = result.scalars().all()
 
-            if side == "long":
-                unrealized_pnl = (current_price - entry) * qty
-            else:
-                unrealized_pnl = (entry - current_price) * qty
+            latest_by_symbol: dict[str, Fill] = {}
+            for f in fills:
+                if f.symbol not in latest_by_symbol:
+                    latest_by_symbol[f.symbol] = f
 
-            positions.append({
-                "symbol": symbol,
-                "side": side,
-                "entry": round(entry, 2),
-                "stop": round(entry * 0.97, 2),  # placeholder stop
-                "target": round(entry * 1.06, 2),  # placeholder target
-                "qty": round(qty, 4),
-                "unrealized_pnl": round(unrealized_pnl, 2),
-                "r_multiple": round(unrealized_pnl / (entry * 0.005 * qty), 2) if entry > 0 else 0,
-                "age": "1d",  # placeholder
-            })
+            positions = []
+            for symbol, fill in latest_by_symbol.items():
+                side = "long" if fill.side == "buy" else "short"
+                entry = float(fill.fill_price)
+                qty = float(fill.qty)
+
+                close_result = await session.execute(
+                    select(MarketData.close)
+                    .where(MarketData.symbol == symbol)
+                    .order_by(desc(MarketData.time))
+                    .limit(1)
+                )
+                close = close_result.scalar_one_or_none()
+                current_price = float(close) if close else entry
+
+                if side == "long":
+                    unrealized_pnl = (current_price - entry) * qty
+                else:
+                    unrealized_pnl = (entry - current_price) * qty
+
+                positions.append({
+                    "symbol": symbol,
+                    "side": side,
+                    "entry": round(entry, 2),
+                    "stop": round(entry * 0.97, 2),
+                    "target": round(entry * 1.06, 2),
+                    "qty": round(qty, 4),
+                    "unrealized_pnl": round(unrealized_pnl, 2),
+                    "r_multiple": round(unrealized_pnl / (entry * 0.005 * qty), 2) if entry > 0 else 0,
+                    "age": "1d",
+                })
     except Exception:  # DB unavailable
         positions = []
 
@@ -227,34 +228,34 @@ async def positions(session: AsyncSession = Depends(get_session)):
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/signals")
 async def signals(
-    status: str | None = Query(None, description="Filter by status: pending, approved, rejected, expired, executed"),
-    session: AsyncSession = Depends(get_session),
+    status: str | None = Query(None, description="Filter by status"),
 ):
     try:
-        q = select(Signal).order_by(desc(Signal.created_at))
-        if status:
-            q = q.where(Signal.status == status)
-        result = await session.execute(q)
-        signals_list = result.scalars().all()
+        async with AsyncSessionLocal() as session:
+            q = select(Signal).order_by(desc(Signal.created_at))
+            if status:
+                q = q.where(Signal.status == status)
+            result = await session.execute(q)
+            signals_list = result.scalars().all()
 
-        return [
-            {
-                "id": str(s.id),
-                "symbol": s.symbol,
-                "setup_type": s.setup_type,
-                "direction": s.direction,
-                "entry_price": float(s.entry_price) if s.entry_price else 0,
-                "stop_price": float(s.stop_price) if s.stop_price else 0,
-                "target_1": float(s.target_1) if s.target_1 else 0,
-                "target_2": float(s.target_2) if s.target_2 else 0,
-                "rr_ratio": float(s.rr_ratio) if s.rr_ratio else 0,
-                "confidence": float(s.confidence) if s.confidence else 0,
-                "status": s.status,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-                "expires_at": s.expires_at.isoformat() if s.expires_at else None,
-            }
-            for s in signals_list
-        ]
+            return [
+                {
+                    "id": str(s.id),
+                    "symbol": s.symbol,
+                    "setup_type": s.setup_type,
+                    "direction": s.direction,
+                    "entry_price": float(s.entry_price) if s.entry_price else 0,
+                    "stop_price": float(s.stop_price) if s.stop_price else 0,
+                    "target_1": float(s.target_1) if s.target_1 else 0,
+                    "target_2": float(s.target_2) if s.target_2 else 0,
+                    "rr_ratio": float(s.rr_ratio) if s.rr_ratio else 0,
+                    "confidence": float(s.confidence) if s.confidence else 0,
+                    "status": s.status,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                }
+                for s in signals_list
+            ]
     except Exception:  # DB unavailable
         return []
 
@@ -263,20 +264,20 @@ async def signals(
 # Risk
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/risk")
-async def risk(session: AsyncSession = Depends(get_session)):
+async def risk():
     try:
-        result = await session.execute(select(Fill).order_by(Fill.filled_at.desc()))
-        fills = result.scalars().all()
-        open_count = len({f.symbol for f in fills})
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(Fill).order_by(Fill.filled_at.desc()))
+            fills = result.scalars().all()
+            open_count = len({f.symbol for f in fills})
 
-        sector_result = await session.execute(
-            select(Instrument.asset_class, func.count(Instrument.id)).group_by(Instrument.asset_class)
-        )
-        sector_exposure = {row[0] or "equity": row[1] for row in sector_result.all()} or {"Technology": 34, "Healthcare": 12}
+            sector_result = await session.execute(
+                select(Instrument.asset_class, func.count(Instrument.id)).group_by(Instrument.asset_class)
+            )
+            sector_exposure = {row[0] or "equity": row[1] for row in sector_result.all()} or {"Technology": 34, "Healthcare": 12}
     except Exception:  # DB unavailable
-        fills = []
-        sector_exposure = {"Technology": 34, "Healthcare": 12}
         open_count = 0
+        sector_exposure = {"Technology": 34, "Healthcare": 12}
 
     return {
         "daily_loss_percent": 0.0,
@@ -292,29 +293,30 @@ async def risk(session: AsyncSession = Depends(get_session)):
 # Market data (latest bar per symbol)
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/market-data/{symbol}")
-async def market_data_latest(symbol: str, session: AsyncSession = Depends(get_session)):
+async def market_data_latest(symbol: str):
     try:
-        result = await session.execute(
-            select(MarketData)
-            .where(MarketData.symbol == symbol)
-            .order_by(desc(MarketData.time))
-            .limit(1)
-        )
-        md = result.scalar_one_or_none()
-        if not md:
-            raise HTTPException(status_code=404, detail=f"No market data for {symbol}")
-        return {
-            "symbol": md.symbol,
-            "time": md.time.isoformat(),
-            "open": float(md.open) if md.open else 0,
-            "high": float(md.high) if md.high else 0,
-            "low": float(md.low) if md.low else 0,
-            "close": float(md.close) if md.close else 0,
-            "volume": md.volume or 0,
-        }
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(MarketData)
+                .where(MarketData.symbol == symbol)
+                .order_by(desc(MarketData.time))
+                .limit(1)
+            )
+            md = result.scalar_one_or_none()
+            if not md:
+                raise HTTPException(status_code=404, detail=f"No market data for {symbol}")
+            return {
+                "symbol": md.symbol,
+                "time": md.time.isoformat(),
+                "open": float(md.open) if md.open else 0,
+                "high": float(md.high) if md.high else 0,
+                "low": float(md.low) if md.low else 0,
+                "close": float(md.close) if md.close else 0,
+                "volume": md.volume or 0,
+            }
     except HTTPException:
         raise
-    except Exception:  # DB unavailable
+    except Exception:
         raise HTTPException(status_code=404, detail=f"No market data for {symbol}")
 
 
@@ -325,31 +327,31 @@ async def market_data_latest(symbol: str, session: AsyncSession = Depends(get_se
 async def market_data_history(
     symbol: str,
     days: int = Query(60, ge=1, le=365),
-    session: AsyncSession = Depends(get_session),
 ):
     try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        result = await session.execute(
-            select(MarketData)
-            .where(MarketData.symbol == symbol)
-            .where(MarketData.time >= cutoff)
-            .order_by(MarketData.time)
-        )
-        rows = result.scalars().all()
-        return {
-            "symbol": symbol,
-            "bars": [
-                {
-                    "time": r.time.isoformat(),
-                    "open": float(r.open) if r.open else 0,
-                    "high": float(r.high) if r.high else 0,
-                    "low": float(r.low) if r.low else 0,
-                    "close": float(r.close) if r.close else 0,
-                    "volume": r.volume or 0,
-                }
-                for r in rows
-            ],
-        }
+        async with AsyncSessionLocal() as session:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            result = await session.execute(
+                select(MarketData)
+                .where(MarketData.symbol == symbol)
+                .where(MarketData.time >= cutoff)
+                .order_by(MarketData.time)
+            )
+            rows = result.scalars().all()
+            return {
+                "symbol": symbol,
+                "bars": [
+                    {
+                        "time": r.time.isoformat(),
+                        "open": float(r.open) if r.open else 0,
+                        "high": float(r.high) if r.high else 0,
+                        "low": float(r.low) if r.low else 0,
+                        "close": float(r.close) if r.close else 0,
+                        "volume": r.volume or 0,
+                    }
+                    for r in rows
+                ],
+            }
     except Exception:  # DB unavailable
         return {"symbol": symbol, "bars": []}
 
@@ -360,7 +362,6 @@ async def market_data_history(
 @app.post("/api/v1/pipeline/run")
 async def pipeline_run():
     """Trigger the agent pipeline against latest persisted market data."""
-    # Defer to the local pipeline runner; in production this would be a background job
     import subprocess, sys
     from pathlib import Path
     script = Path(__file__).resolve().parents[1] / "scripts" / "run_pipeline.py"
@@ -384,75 +385,80 @@ async def pipeline_run():
 # User saved charts — save a snapshot with 1+ month historical data
 # ---------------------------------------------------------------------------
 @app.post("/api/v1/user/charts")
-async def save_chart(payload: dict, session: AsyncSession = Depends(get_session)):
+async def save_chart(payload: dict):
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id required")
     try:
-        chart = SavedChart(
-            user_id=uuid.UUID(user_id),
-            name=payload.get("name", "Untitled Chart"),
-            symbols=payload.get("symbols", []),
-            regime=payload.get("regime"),
-            market_data=payload.get("market_data"),
-            signals=payload.get("signals"),
-            positions=payload.get("positions"),
-            risk=payload.get("risk"),
-        )
-        session.add(chart)
-        await session.commit()
-        await session.refresh(chart)
-        return {"id": str(chart.id), "message": "Chart saved"}
-    except Exception:  # DB unavailable
+        async with AsyncSessionLocal() as session:
+            chart = SavedChart(
+                user_id=uuid.UUID(user_id),
+                name=payload.get("name", "Untitled Chart"),
+                symbols=payload.get("symbols", []),
+                regime=payload.get("regime"),
+                market_data=payload.get("market_data"),
+                signals=payload.get("signals"),
+                positions=payload.get("positions"),
+                risk=payload.get("risk"),
+            )
+            session.add(chart)
+            await session.commit()
+            await session.refresh(chart)
+            return {"id": str(chart.id), "message": "Chart saved"}
+    except Exception:
         raise HTTPException(status_code=503, detail="Database not configured")
 
 
 @app.get("/api/v1/user/charts")
-async def list_charts(user_id: str = Query(...), session: AsyncSession | None = None):
+async def list_charts(user_id: str = Query(...)):
     try:
-        result = await session.execute(
-            select(SavedChart)
-            .where(SavedChart.user_id == uuid.UUID(user_id))
-            .order_by(desc(SavedChart.updated_at))
-        )
-        charts = result.scalars().all()
-        return [
-            {
-                "id": str(c.id),
-                "name": c.name,
-                "symbols": c.symbols,
-                "regime": c.regime,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-            }
-            for c in charts
-        ]
-    except Exception:  # DB unavailable
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(SavedChart)
+                .where(SavedChart.user_id == uuid.UUID(user_id))
+                .order_by(desc(SavedChart.updated_at))
+            )
+            charts = result.scalars().all()
+            return [
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "symbols": c.symbols,
+                    "regime": c.regime,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+                }
+                for c in charts
+            ]
+    except Exception:
         return []
 
 
 @app.get("/api/v1/user/charts/{chart_id}")
-async def get_chart(chart_id: str, session: AsyncSession | None = None):
+async def get_chart(chart_id: str):
     try:
-        result = await session.execute(select(SavedChart).where(SavedChart.id == uuid.UUID(chart_id)))
-        chart = result.scalar_one_or_none()
-        if not chart:
-            raise HTTPException(status_code=404, detail="Chart not found")
-        return {
-            "id": str(chart.id),
-            "name": chart.name,
-            "symbols": chart.symbols,
-            "regime": chart.regime,
-            "market_data": chart.market_data,
-            "signals": chart.signals,
-            "positions": chart.positions,
-            "risk": chart.risk,
-            "created_at": chart.created_at.isoformat() if chart.created_at else None,
-            "updated_at": chart.updated_at.isoformat() if chart.updated_at else None,
-        }
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(SavedChart).where(SavedChart.id == uuid.UUID(chart_id))
+            )
+            chart = result.scalar_one_or_none()
+            if not chart:
+                raise HTTPException(status_code=404, detail="Chart not found")
+            return {
+                "id": str(chart.id),
+                "name": chart.name,
+                "symbols": chart.symbols,
+                "regime": chart.regime,
+                "market_data": chart.market_data,
+                "signals": chart.signals,
+                "positions": chart.positions,
+                "risk": chart.risk,
+                "created_at": chart.created_at.isoformat() if chart.created_at else None,
+                "updated_at": chart.updated_at.isoformat() if chart.updated_at else None,
+            }
     except HTTPException:
         raise
-    except Exception:  # DB unavailable
+    except Exception:
         raise HTTPException(status_code=404, detail="Chart not found")
 
 
@@ -460,40 +466,47 @@ async def get_chart(chart_id: str, session: AsyncSession | None = None):
 # User saved layouts
 # ---------------------------------------------------------------------------
 @app.post("/api/v1/user/layouts")
-async def save_layout(payload: dict, session: AsyncSession = Depends(get_session)):
+async def save_layout(payload: dict):
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id required")
-
-    layout = SavedLayout(
-        user_id=uuid.UUID(user_id),
-        name=payload.get("name", "Untitled Layout"),
-        layout_config=payload.get("layout_config", {}),
-    )
-    session.add(layout)
-    await session.commit()
-    await session.refresh(layout)
-    return {"id": str(layout.id), "message": "Layout saved"}
+    try:
+        async with AsyncSessionLocal() as session:
+            layout = SavedLayout(
+                user_id=uuid.UUID(user_id),
+                name=payload.get("name", "Untitled Layout"),
+                layout_config=payload.get("layout_config", {}),
+            )
+            session.add(layout)
+            await session.commit()
+            await session.refresh(layout)
+            return {"id": str(layout.id), "message": "Layout saved"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database not configured")
 
 
 @app.get("/api/v1/user/layouts")
-async def list_layouts(user_id: str = Query(...), session: AsyncSession = Depends(get_session)):
-    result = await session.execute(
-        select(SavedLayout)
-        .where(SavedLayout.user_id == uuid.UUID(user_id))
-        .order_by(desc(SavedLayout.updated_at))
-    )
-    layouts = result.scalars().all()
-    return [
-        {
-            "id": str(l.id),
-            "name": l.name,
-            "layout_config": l.layout_config,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
-            "updated_at": l.updated_at.isoformat() if l.updated_at else None,
-        }
-        for l in layouts
-    ]
+async def list_layouts(user_id: str = Query(...)):
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(SavedLayout)
+                .where(SavedLayout.user_id == uuid.UUID(user_id))
+                .order_by(desc(SavedLayout.updated_at))
+            )
+            layouts = result.scalars().all()
+            return [
+                {
+                    "id": str(l.id),
+                    "name": l.name,
+                    "layout_config": l.layout_config,
+                    "created_at": l.created_at.isoformat() if l.created_at else None,
+                    "updated_at": l.updated_at.isoformat() if l.updated_at else None,
+                }
+                for l in layouts
+            ]
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
