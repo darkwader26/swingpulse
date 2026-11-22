@@ -703,6 +703,7 @@
   .bg-bg { background-color: var(--bg); }
   .bg-surface { background-color: var(--surface); }
   .border-border { border-color: var(--border); }
+  .text-ok { color: var(--success); }
   .text-warning { color: var(--warning); }
   .text-success { color: var(--success); }
   .text-danger { color: var(--danger); }

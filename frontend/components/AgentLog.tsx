@@ -11,37 +11,25 @@ export function AgentLog({ initialEvents = [], wsUrl }: AgentLogProps) {
   const [connected, setConnected] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
+  // Polling-based agent log (replaces WebSocket — Vercel edge doesn't support WS)
   useEffect(() => {
-    const url = wsUrl || (typeof window !== 'undefined' ? window.location.origin.replace(/^http/, 'ws') : '') + '/ws/events'
-    let socket: WebSocket | null = null
-
-    try {
-      socket = new WebSocket(url)
-      socket.onopen = () => setConnected(true)
-      socket.onclose = () => setConnected(false)
-      socket.onerror = () => setConnected(false)
-      socket.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          const entry: AgentEvent = {
-            agent_name: msg.agent_name ?? 'system',
-            event_type: msg.event_type ?? 'event',
-            payload: msg.payload,
-            created_at: msg.created_at ?? new Date().toISOString(),
+    setConnected(true)
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch('/api/proxy/agents/logs', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          const incoming: AgentEvent[] = Array.isArray(data) ? data : data.events || []
+          if (incoming.length > 0) {
+            setEvents((prev) => [...incoming, ...prev].slice(0, 200))
           }
-          setEvents((prev) => [entry, ...prev].slice(0, 200))
-        } catch {
-          // ignore malformed messages
         }
+      } catch {
+        setConnected(false)
       }
-    } catch {
-      setConnected(false)
-    }
-
-    return () => {
-      socket?.close()
-    }
-  }, [wsUrl])
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   const scrollToBottom = () => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,26 +41,33 @@ export function AgentLog({ initialEvents = [], wsUrl }: AgentLogProps) {
 
   const time = (iso: string) => {
     try {
-      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      return new Date(iso).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
     } catch {
       return iso
     }
   }
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-3">
+    <div className="card flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 flex items-center justify-between mb-3 border-b border-border pb-1">
         <h2>AGENT DECISION LOG</h2>
         <span className={`text-xs font-bold mono ${connected ? 'text-success' : 'text-muted'}`}>
-          {connected ? '● LIVE' : '● OFFLINE'}
+          {connected ? '● LIVE (POLLING)' : '● OFFLINE'}
         </span>
       </div>
-      <div className="scroll" style={{ maxHeight: 420 }}>
+      <div className="flex-1 min-h-0 overflow-y-auto scroll">
         {events.length === 0 ? (
-          <div className="text-muted p-4">NO AGENT EVENTS YET</div>
+          <div className="text-muted p-4 text-center">NO AGENT EVENTS YET</div>
         ) : (
           events.map((e) => (
-            <div key={`${e.created_at}-${e.agent_name}`} className="log-entry">
+            <div
+              key={`${e.created_at}-${e.agent_name}-${Math.random()}`}
+              className="log-entry"
+            >
               <span className="log-time">{time(e.created_at)}</span>
               <span className="log-agent">{e.agent_name}</span>
               <span className="log-msg">{e.event_type}</span>
