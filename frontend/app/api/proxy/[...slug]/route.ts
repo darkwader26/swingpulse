@@ -57,14 +57,19 @@ async function proxyRequest(
     method,
     headers,
     body,
+    cache: 'no-store',
   })
 
+  // Forward only safe response headers
   const responseHeaders: Record<string, string> = {}
+  const allowed = ['content-type', 'cache-control', 'access-control-allow-origin']
   res.headers.forEach((value, key) => {
-    responseHeaders[key] = value
+    if (allowed.includes(key.toLowerCase())) {
+      responseHeaders[key] = value
+    }
   })
 
-  const data = await res.text()
+  const data = await res.arrayBuffer()
 
   return new NextResponse(data, {
     status: res.status,
