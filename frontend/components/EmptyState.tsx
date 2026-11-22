@@ -1,0 +1,17 @@
+import { type ReactNode } from 'react'
+
+interface EmptyStateProps {
+  title: string
+  subtitle?: string
+  icon?: string
+}
+
+export function EmptyState({ title, subtitle, icon }: EmptyStateProps) {
+  return (
+    <div className="empty">
+      {icon && <div className="text-[24px] mb-3">{icon}</div>}
+      <div className="text-[13px] font-semibold">{title}</div>
+      {subtitle && <div className="text-[11px] text-muted mt-1">{subtitle}</div>}
+    </div>
+  )
+}
