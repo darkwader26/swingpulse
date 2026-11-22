@@ -60,19 +60,16 @@ async function proxyRequest(
     cache: 'no-store',
   })
 
-  // Forward only safe response headers
-  const responseHeaders: Record<string, string> = {}
-  const allowed = ['content-type', 'cache-control', 'access-control-allow-origin']
-  res.headers.forEach((value, key) => {
-    if (allowed.includes(key.toLowerCase())) {
-      responseHeaders[key] = value
-    }
-  })
+  const contentType = res.headers.get('content-type') ?? 'application/json'
 
-  const data = await res.arrayBuffer()
+  // Read body as text — more reliable than ArrayBuffer passthrough on Vercel
+  const text = await res.text()
 
-  return new NextResponse(data, {
+  return new NextResponse(text, {
     status: res.status,
-    headers: responseHeaders,
+    headers: {
+      'content-type': contentType,
+      'cache-control': 'no-store',
+    },
   })
 }
