@@ -61,3 +61,5 @@ live_market_data.json
 # Logs
 *.log
 logs/
+.vercel
+.env*
