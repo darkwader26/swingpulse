@@ -395,9 +395,13 @@ async def market_data_bulk(payload: dict):
                 time_str = row.get("time")
                 if not symbol or not time_str:
                     continue
-                inst = await session.get(Instrument, symbol)
+                result = await session.execute(
+                    select(Instrument).where(Instrument.symbol == symbol)
+                )
+                inst = result.scalar_one_or_none()
                 if not inst:
-                    session.add(Instrument(symbol=symbol, asset_class="equity"))
+                    inst = Instrument(symbol=symbol, asset_class="equity")
+                    session.add(inst)
                     await session.commit()
                     await session.refresh(inst)
                 session.add(MarketData(
