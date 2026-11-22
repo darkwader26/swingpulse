@@ -198,6 +198,22 @@ export default function Dashboard() {
     if (user?.id) refreshSavedCharts()
   }, [user, refreshSavedCharts])
 
+  // ── Kill switch toggle ──
+  const [killSwitchOn, setKillSwitchOn] = useState(risk.kill_switch)
+  const handleKillSwitch = useCallback(async () => {
+    setKillSwitchOn((prev) => {
+      const next = !prev
+      try {
+        void fetchJson('/risk/kill-switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kill_switch: next }),
+        }).catch(() => { /* ignore */ })
+      } catch { /* ignore */ }
+      return next
+    })
+  }, [fetchJson])
+
   return (
     <div className="min-h-screen bg-bg text-ink font-sans antialiased desktop-bg" style={{ minHeight: '100vh', position: 'relative', zIndex: 0 }}>
       {/* Desktop Icons (left side, fixed) */}
@@ -248,6 +264,12 @@ export default function Dashboard() {
                 <StatusDot status="online" />
                 <span>AGENTS ONLINE</span>
                 <span>{dateStr} &nbsp;|&nbsp; {timeStr} UTC</span>
+                <button
+                  onClick={handleKillSwitch}
+                  className={`btn btn-xs px-2 py-0.5 border rounded-none ${killSwitchOn ? 'bg-danger text-white' : 'text-warning border-warning'}`}
+                >
+                  {killSwitchOn ? 'KILL: ON' : 'KILL SWITCH'}
+                </button>
               </div>
             </div>
           </header>
@@ -280,17 +302,13 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Row 2: Three-Room Office Layout */}
-          <div className="office-layout flex-1 min-h-0 overflow-hidden">
-            {/* Left: Main Office — Watchlist + Positions */}
-            <div className="office-room--main h-full flex flex-col overflow-hidden gap-1">
-              <div className="office-room-label">MAIN OFFICE</div>
-
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-1">
-                <div className="flex-shrink-0 border-b border-border pb-1 mb-1">
-                  <h2 className="text-[10px] mb-0 text-office-trim font-extrabold tracking-tighter">WATCHLIST</h2>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto scroll">
+          {/* Row 2 + Row 3: Three-Column Grid per DESIGN_SPEC.md Layout Composition */}
+          <div className="dashboard-grid flex-1 min-h-0 overflow-hidden">
+            {/* LEFT COLUMN — Watchlist (top) + Positions (bottom) */}
+            <div className="flex flex-col h-full gap-1">
+              <div className="office-room--main flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-wood">
+                <div className="office-room-label">MAIN OFFICE — WATCHLIST</div>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll p-1">
                   <table className="w-full text-[10px]">
                     <thead>
                       <tr>
@@ -322,89 +340,75 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
+              </div>
 
-                <div className="flex-shrink-0 border-b border-border pb-1 mb-1">
-                  <h2 className="text-[10px] mb-0 text-office-trim font-extrabold tracking-tighter">OPEN POSITIONS</h2>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto scroll">
+              <div className="office-room--main flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-wood mt-1">
+                <div className="office-room-label">MAIN OFFICE — POSITIONS</div>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll p-1">
                   <PositionsTable positions={positions} />
                 </div>
               </div>
-
-              <div className="flex-shrink-0 mt-1 flex justify-end gap-1">
-                <span className="office-plant" title="Ficus" />
-                <span className="office-plant" title="Pothos" />
-                <span className="office-plant" title="Snake" />
-              </div>
             </div>
 
-            {/* Middle: Conference room + Lounge nested below it */}
+            {/* CENTER COLUMN — Equity Curve + metrics (top) + Open Positions Table (bottom) */}
             <div className="flex flex-col h-full gap-1">
-              <div className="office-room--conference flex-1 min-h-0 overflow-hidden flex flex-col">
-                <div className="office-room-label">CONFERENCE</div>
-
-                {/* Top: Command Table */}
-                <div className="flex-shrink-0 overflow-hidden">
-                  <div className="office-conference-table relative flex-1 min-h-0 overflow-hidden flex flex-col">
-                    <span className="absolute top-2 left-2 text-[9px] text-office-trim font-bold">SYSTEM STATUS</span>
-                    <div className="flex-1 min-h-0 flex items-center justify-center">
-                      <div className="text-[20px] font-black text-glitch" data-text="ONLINE">ONLINE</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Metrics Grid */}
-                <div className="flex-shrink-0 grid grid-cols-2 gap-2">
-                  <div className="card h-full p-2">
-                    <div className="text-label mb-1">TODAY P&L</div>
-                    <div className="metric-value">{totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}</div>
-                    <div className={`metric-delta ${totalUnrealized >= 0 ? 'pos' : 'neg'}`}>{totalUnrealized >= 0 ? '+' : ''}${(totalUnrealized / 10000 * 100).toFixed(2)}%</div>
-                  </div>
-                  <div className="card h-full p-2">
-                    <div className="text-label mb-1">WIN RATE</div>
-                    <div className="metric-value">{winRate}</div>
-                    <div className="metric-delta neu">LAST 50 TRADES</div>
-                  </div>
-                </div>
-
-                {/* Equity Curve */}
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <div className="card h-full p-2 flex flex-col overflow-hidden">
+              <div className="office-room--conference flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-wall">
+                <div className="office-room-label">CONFERENCE — COMMAND</div>
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-2 p-1">
+                  {/* Equity Curve */}
+                  <div className="flex-1 min-h-0 overflow-hidden card p-2 flex flex-col">
                     <div className="flex-shrink-0 text-label mb-1">EQUITY CURVE (60 DAYS)</div>
                     <div className="flex-1 min-h-0 relative overflow-hidden">
                       <EquityCurve data={equityData} />
                     </div>
                   </div>
+                  {/* Metrics Grid */}
+                  <div className="flex-shrink-0 grid grid-cols-2 gap-2">
+                    <div className="card h-full p-2">
+                      <div className="text-label mb-1">TODAY P&L</div>
+                      <div className="metric-value">{totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}</div>
+                      <div className={`metric-delta ${totalUnrealized >= 0 ? 'pos' : 'neg'}`}>{totalUnrealized >= 0 ? '+' : ''}${(totalUnrealized / 10000 * 100).toFixed(2)}%</div>
+                    </div>
+                    <div className="card h-full p-2">
+                      <div className="text-label mb-1">WIN RATE</div>
+                      <div className="metric-value">{winRate}</div>
+                      <div className="metric-delta neu">LAST 50 TRADES</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Lounge (bottom of middle column) */}
-              <div className="office-room--lounge flex-shrink-0 overflow-hidden">
-                <div className="office-room-label">LOUNGE</div>
-                <h2 className="text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">PAPER TRADING LOUNGE</h2>
-                <div className="flex-1 flex items-center justify-center gap-3">
-                  <KillSwitch initial={risk.kill_switch} />
-                  <div className="text-[10px] font-bold mono text-office-desk">
-                    <span className="status-dot standby" /> SIMULATION MODE — NO LIVE CAPITAL
-                  </div>
-                </div>
-                <div className="mt-1 flex justify-center gap-1">
-                  <span className="office-plant" title="Ficus" />
-                  <span className="office-plant" title="Pothos" />
-                  <span className="office-plant" title="Snake" />
+              <div className="office-room--conference flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-wall mt-1">
+                <div className="office-room-label">CONFERENCE — POSITIONS TABLE</div>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll p-1">
+                  <div className="text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">OPEN POSITIONS (DETAIL)</div>
+                  <PositionsTable positions={positions} />
                 </div>
               </div>
             </div>
 
-            {/* Right: Server Room */}
-            <div className="office-room--server h-full flex flex-col overflow-hidden gap-1">
-              <div className="office-room-label">SERVER ROOM</div>
-
-              <div className="flex-shrink-0 border-b border-border pb-1 mb-1">
-                <h2 className="text-[10px] mb-0 text-office-trim font-extrabold tracking-tighter">AGENT RACKS</h2>
+            {/* RIGHT COLUMN — Risk Heatmap (top) + Signal Pipeline (bottom) */}
+            <div className="flex flex-col h-full gap-1">
+              <div className="office-room--server flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-brick">
+                <div className="office-room-label">SERVER ROOM — RISK</div>
+                <div className="flex-1 min-h-0 overflow-hidden p-1">
+                  <RiskHeatmap risk={risk} />
+                </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto scroll">
-                <div className="office-server-grid">
+
+              <div className="office-room--server flex-1 min-h-0 overflow-hidden border border-office-trim bg-office-brick mt-1">
+                <div className="office-room-label">SERVER ROOM — SIGNAL PIPELINE</div>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll p-1">
+                  <SignalQueue signals={signals} />
+                </div>
+              </div>
+            </div>
+
+            {/* AGENT RACKS — full-width band at bottom of grid */}
+            <div className="office-room--server flex-shrink-0 overflow-hidden border border-office-trim bg-office-brick h-32">
+              <div className="office-room-label">SERVER ROOM — AGENT RACKS</div>
+              <div className="flex-1 min-h-0 p-1">
+                <div className="office-server-grid flex-1 min-h-0 overflow-hidden">
                   <div className="office-server-rack" title="Scanner">
                     <div className="office-server-rack-top" />
                     <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.scanner.status}</span>
@@ -427,34 +431,15 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
-              <div className="flex-shrink-0 border-b border-border pb-1 mb-1">
-                <h2 className="text-[10px] mb-0 text-office-trim font-extrabold tracking-tighter">RISK HEATMAP</h2>
-              </div>
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <RiskHeatmap risk={risk} />
-              </div>
             </div>
           </div>
 
-          {/* Row 3: Signal Pipeline + Agent Log */}
+          {/* Row 4: Agent Decision Log — full width */}
           <div className="flex-1 min-h-0 overflow-hidden mt-1">
-            <div className="grid grid-cols-12 gap-3 h-full">
-              <div className="col-span-6 h-full flex flex-col overflow-hidden">
-                <div className="card h-full flex flex-col overflow-hidden">
-                  <div className="flex-shrink-0 text-[11px] mb-1 font-extrabold tracking-tighter uppercase">Signal Pipeline</div>
-                  <div className="flex-1 min-h-0 overflow-y-auto scroll">
-                    <SignalQueue signals={signals} />
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-6 h-full flex flex-col overflow-hidden">
-                <div className="card h-full flex flex-col overflow-hidden">
-                  <div className="flex-shrink-0 text-[11px] mb-1 font-extrabold tracking-tighter uppercase">Agent Decision Log</div>
-                  <div className="flex-1 min-h-0 overflow-y-auto scroll">
-                    <AgentLog initialEvents={events} />
-                  </div>
-                </div>
+            <div className="card h-full flex flex-col overflow-hidden">
+              <div className="flex-shrink-0 text-[11px] mb-1 font-extrabold tracking-tighter uppercase">Agent Decision Log</div>
+              <div className="flex-1 min-h-0 overflow-y-auto scroll">
+                <AgentLog initialEvents={events} />
               </div>
             </div>
           </div>

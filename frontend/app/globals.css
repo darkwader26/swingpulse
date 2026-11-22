@@ -970,3 +970,21 @@
 .bg-office-wall { background-color: var(--office-wall); }
 .text-office-trim { color: var(--office-trim); }
 .text-office-desk { color: var(--office-desk); }
+
+.border-office-trim { border-color: var(--office-trim); }
+
+/* ── Dashboard grid per DESIGN_SPEC.md Layout Composition ──
+   Row 2: Watchlist | Equity Curve + metrics | Risk Heatmap
+   Row 3: Positions | Open Positions Table | Signal Pipeline
+   Agent racks span full width at bottom
+*/
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr auto;
+  gap: 1px;
+  height: 100%;
+}
+.dashboard-grid > .flex-1 {
+  min-height: 0;
+}
