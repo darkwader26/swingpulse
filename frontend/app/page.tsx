@@ -201,7 +201,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-bg text-ink font-sans antialiased desktop-bg" style={{ minHeight: '100vh', position: 'relative', zIndex: 0 }}>
       {/* Desktop Icons (left side) */}
-      <div className="fixed top-12 left-4 flex flex-col gap-4 z-20 pointer-events-none">
+      <div className="fixed top-16 left-4 flex flex-col gap-4 z-20 pointer-events-none">
         <a href="#" className="desktop-icon selected pointer-events-auto">
           <div className="desktop-icon-icon">▨</div>
           <span>COMMAND</span>
@@ -221,7 +221,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Window Frame */}
-      <div className="window max-w-[1200px] mx-auto mt-8 mb-40 h-[calc(100vh-140px)] z-10 relative" style={{ minHeight: '600px' }}>
+      <div className="window w-full max-w-none mx-auto mt-8 mb-8 h-[calc(100vh-100px)] z-10 relative overflow-hidden">
         <div className="window-titlebar">
           <span>SWINGPULSE v6.0 — COMMAND CENTER</span>
           <div className="window-controls">
@@ -230,21 +230,21 @@ export default function Dashboard() {
             <div className="window-control" style={{ color: '#27c93f' }}>●</div>
           </div>
         </div>
-        <div className="window-body h-full flex flex-col gap-6">
+        <div className="window-body h-full flex flex-col overflow-hidden gap-0">
 
           {/* Row 1: Header Bar */}
-          <header className="border-b border-border pb-4">
+          <header className="flex-shrink-0 border-b border-border pb-2 mb-1">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-[14px] font-extrabold tracking-widest text-glitch" data-text="SWINGPULSE">SWINGPULSE</span>
-                <span className="text-xs font-bold text-muted border-l border-border pl-2">PAPER TRADING</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[13px] font-extrabold tracking-widest text-glitch" data-text="SWINGPULSE">SWINGPULSE</span>
+                <span className="text-[10px] font-bold text-muted border-l border-border pl-2">PAPER TRADING</span>
                 {user && (
-                  <span className="text-xs font-bold text-accent-long flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-accent-long flex items-center gap-1.5">
                     <StatusDot status="online" /> {user.email}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-xs font-bold mono">
+              <div className="flex items-center gap-3 text-[10px] font-bold mono">
                 <StatusDot status="online" />
                 <span>AGENTS ONLINE</span>
                 <span>{dateStr} &nbsp;|&nbsp; {timeStr} UTC</span>
@@ -254,37 +254,39 @@ export default function Dashboard() {
 
           {/* Saved charts bar (user persistence) */}
           {user && (
-            <div className="flex items-center gap-2 px-2">
-              <div className="text-label flex items-center gap-1">SAVED CHARTS</div>
-              {savedCharts.length > 0 ? (
-                savedCharts.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => loadSavedChart(c.id)}
-                    className="btn btn-sm text-xs hover:bg-surface"
-                  >
-                    {c.name}
-                  </button>
-                ))
-              ) : (
-                <span className="text-xs text-muted">No saved charts</span>
-              )}
-              <button
-                onClick={saveChart}
-                className="btn btn-sm text-xs border-accent-long text-accent-long"
-              >
-                SAVE CURRENT (30 DAYS)
-              </button>
+            <div className="flex-shrink-0 px-2 py-1 mb-1">
+              <div className="flex items-center gap-2">
+                <div className="text-label flex items-center gap-1">SAVED CHARTS</div>
+                {savedCharts.length > 0 ? (
+                  savedCharts.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => loadSavedChart(c.id)}
+                      className="btn btn-sm text-xs hover:bg-surface"
+                    >
+                      {c.name}
+                    </button>
+                  ))
+                ) : (
+                  <span className="text-[10px] text-muted">No saved charts</span>
+                )}
+                <button
+                  onClick={saveChart}
+                  className="btn btn-sm text-xs border-accent-long text-accent-long"
+                >
+                  SAVE CURRENT (30 DAYS)
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Row 2: Three-Room Office Layout */}
-          <div className="office-layout flex-1 min-h-0 gap-0">
+          {/* Row 2: Three-Room Office Layout (flex-1, fills remaining top space) */}
+          <div className="office-layout flex-1 min-h-0 overflow-hidden">
             {/* Left: Main Office */}
-            <div className="office-room--main flex flex-col gap-2">
+            <div className="office-room--main h-full flex flex-col overflow-hidden gap-1">
               <div className="office-room-label">MAIN OFFICE</div>
-              <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">WATCHLIST</h2>
-              <div className="flex-1 scroll min-h-0">
+              <h2 className="flex-shrink-0 text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">WATCHLIST</h2>
+              <div className="flex-1 min-h-0 overflow-y-auto scroll">
                 <table>
                   <thead>
                     <tr>
@@ -302,13 +304,13 @@ export default function Dashboard() {
                           <td className="mono">{p.symbol}</td>
                           <td className="mono">${p.entry.toFixed(2)}</td>
                           <td className={`mono ${pnlSign(p.unrealized_pnl)}`}>{p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(2)}</td>
-                          <td className="text-muted">{regime(p.symbol)}</td>
+                          <td className="text-[10px] text-muted">{regime(p.symbol)}</td>
                           <td><span className="badge badge-approved">OPEN</span></td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="text-muted py-4 text-center">
+                        <td colSpan={5} className="text-[10px] text-muted py-3 text-center">
                           <EmptyState title="NO WATCHLIST DATA" subtitle="Unable to load symbols from API" />
                         </td>
                       </tr>
@@ -316,13 +318,13 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 flex flex-col gap-2">
-                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">OPEN POSITIONS</h2>
-                <div className="flex-1 min-h-0">
+              <div className="mt-1 flex flex-col gap-1">
+                <h2 className="flex-shrink-0 text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">OPEN POSITIONS</h2>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll">
                   <PositionsTable positions={positions} />
                 </div>
               </div>
-              <div className="mt-2 flex justify-end gap-2">
+              <div className="mt-1 flex justify-end gap-1">
                 <span className="office-plant" title="Ficus" />
                 <span className="office-plant" title="Pothos" />
                 <span className="office-plant" title="Snake" />
@@ -330,45 +332,45 @@ export default function Dashboard() {
             </div>
 
             {/* Middle: Conference + Lounge */}
-            <div className="flex flex-col gap-4">
-              <div className="office-room--conference flex flex-col gap-2">
+            <div className="flex h-full flex-col gap-4 overflow-hidden">
+              <div className="office-room--conference flex-1 min-h-0 flex flex-col overflow-hidden gap-1">
                 <div className="office-room-label">CONFERENCE</div>
-                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">COMMAND TABLE</h2>
-                <div className="flex-1 min-h-0 flex flex-col">
-                  <div className="office-conference-table relative">
-                    <span className="absolute top-2 left-2 text-[10px] text-office-trim font-bold">SYSTEM STATUS</span>
-                    <div className="text-[24px] font-black text-glitch" data-text="ONLINE">ONLINE</div>
+                <h2 className="flex-shrink-0 text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">COMMAND TABLE</h2>
+                <div className="office-conference-table relative flex-1 min-h-0 overflow-hidden flex flex-col">
+                  <span className="absolute top-2 left-2 text-[9px] text-office-trim font-bold">SYSTEM STATUS</span>
+                  <div className="flex-1 min-h-0 flex items-center justify-center">
+                    <div className="text-[20px] font-black text-glitch" data-text="ONLINE">ONLINE</div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="card h-full p-2">
-                      <div className="text-label mb-1">TODAY P&L</div>
-                      <div className="metric-value">{totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}</div>
-                      <div className={`metric-delta ${totalUnrealized >= 0 ? 'pos' : 'neg'}`}>{totalUnrealized >= 0 ? '+' : ''}${(totalUnrealized / 10000 * 100).toFixed(2)}%</div>
-                    </div>
-                    <div className="card h-full p-2">
-                      <div className="text-label mb-1">WIN RATE</div>
-                      <div className="metric-value">{winRate}</div>
-                      <div className="metric-delta neu">LAST 50 TRADES</div>
-                    </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="card h-full p-2">
+                    <div className="text-label mb-1">TODAY P&L</div>
+                    <div className="metric-value">{totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}</div>
+                    <div className={`metric-delta ${totalUnrealized >= 0 ? 'pos' : 'neg'}`}>{totalUnrealized >= 0 ? '+' : ''}${(totalUnrealized / 10000 * 100).toFixed(2)}%</div>
                   </div>
-                  <div className="mt-4 card h-full p-2 flex flex-col">
-                    <div className="text-label mb-1">EQUITY CURVE (60 DAYS)</div>
-                    <div className="flex-1 min-h-0 relative">
-                      <EquityCurve data={equityData} />
-                    </div>
+                  <div className="card h-full p-2">
+                    <div className="text-label mb-1">WIN RATE</div>
+                    <div className="metric-value">{winRate}</div>
+                    <div className="metric-delta neu">LAST 50 TRADES</div>
+                  </div>
+                </div>
+                <div className="mt-2 card h-full p-2 flex flex-col overflow-hidden">
+                  <div className="text-label mb-1">EQUITY CURVE (60 DAYS)</div>
+                  <div className="flex-1 min-h-0 relative overflow-hidden">
+                    <EquityCurve data={equityData} />
                   </div>
                 </div>
               </div>
-              <div className="office-room--lounge flex flex-col gap-2 h-48">
+              <div className="office-room--lounge flex-shrink-0 overflow-hidden">
                 <div className="office-room-label">LOUNGE</div>
-                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">PAPER TRADING LOUNGE</h2>
-                <div className="flex-1 flex items-center justify-center gap-4">
+                <h2 className="flex-shrink-0 text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">PAPER TRADING LOUNGE</h2>
+                <div className="flex-1 flex items-center justify-center gap-3">
                   <KillSwitch initial={risk.kill_switch} />
-                  <div className="text-xs font-bold mono text-office-desk">
+                  <div className="text-[10px] font-bold mono text-office-desk">
                     <span className="status-dot standby" /> SIMULATION MODE — NO LIVE CAPITAL
                   </div>
                 </div>
-                <div className="mt-2 flex justify-center gap-2">
+                <div className="mt-1 flex justify-center gap-1">
                   <span className="office-plant" title="Ficus" />
                   <span className="office-plant" title="Pothos" />
                   <span className="office-plant" title="Snake" />
@@ -377,10 +379,10 @@ export default function Dashboard() {
             </div>
 
             {/* Right: Server Room */}
-            <div className="office-room--server flex flex-col gap-2">
+            <div className="office-room--server h-full flex flex-col overflow-hidden gap-1">
               <div className="office-room-label">SERVER ROOM</div>
-              <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">AGENT RACKS</h2>
-              <div className="flex-1 min-h-0">
+              <h2 className="flex-shrink-0 text-[10px] mb-1 text-office-trim font-extrabold tracking-tighter">AGENT RACKS</h2>
+              <div className="flex-1 min-h-0 overflow-y-auto scroll">
                 <div className="office-server-grid">
                   <div className="office-server-rack" title="Scanner">
                     <div className="office-server-rack-top" />
@@ -404,9 +406,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="mt-2 card h-full p-2 flex flex-col">
+              <div className="mt-1 card h-full p-2 flex flex-col overflow-hidden">
                 <div className="text-label mb-1">RISK HEATMAP</div>
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <RiskHeatmap risk={risk} />
                 </div>
               </div>
@@ -414,31 +416,32 @@ export default function Dashboard() {
           </div>
 
           {/* Row 3: Signal Pipeline + Agent Log */}
-          <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-6">
-              <div className="card h-full flex flex-col">
-                <h2 className="flex-shrink-0">SIGNAL PIPELINE</h2>
-                <div className="flex-1 scroll min-h-0">
-                  <SignalQueue signals={signals} />
+          <div className="flex-1 min-h-0 overflow-hidden mt-1">
+            <div className="grid grid-cols-12 gap-3 h-full">
+              <div className="col-span-6 h-full flex flex-col overflow-hidden">
+                <div className="card h-full flex flex-col overflow-hidden">
+                  <h2 className="flex-shrink-0 text-[11px] mb-1 font-extrabold tracking-tighter uppercase">Signal Pipeline</h2>
+                  <div className="flex-1 min-h-0 overflow-y-auto scroll">
+                    <SignalQueue signals={signals} />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="col-span-6">
-              <div className="card h-full flex flex-col">
-                <h2 className="flex-shrink-0">AGENT DECISION LOG</h2>
-                <div className="flex-1 scroll min-h-0">
-                  <AgentLog initialEvents={events} />
+              <div className="col-span-6 h-full flex flex-col overflow-hidden">
+                <div className="card h-full flex flex-col overflow-hidden">
+                  <h2 className="flex-shrink-0 text-[11px] mb-1 font-extrabold tracking-tighter uppercase">Agent Decision Log</h2>
+                  <div className="flex-1 min-h-0 overflow-y-auto scroll">
+                    <AgentLog initialEvents={events} />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {loading && (
-            <div className="mt-2 text-xs text-muted mono">LOADING DATA FROM LIVE API…</div>
-          )}
-          {!apiOk && (
-            <div className="mt-2 text-xs text-warning mono">⚠ LIVE API UNREACHABLE — SHOWING CACHED/MOCK DATA</div>
-          )}
+          {/* Status strip */}
+          <div className="flex-shrink-0 mt-1">
+            {loading && <div className="text-[10px] text-muted mono">LOADING DATA FROM LIVE API…</div>}
+            {!apiOk && <div className="text-[10px] text-warning mono">⚠ LIVE API UNREACHABLE — SHOWING CACHED/MOCK DATA</div>}
+          </div>
 
         </div>
       </div>

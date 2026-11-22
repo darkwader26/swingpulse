@@ -724,6 +724,7 @@
   gap: 4px;
   height: 100%;
   width: 100%;
+  min-height: 0;
 }
 
 /* Left Room: Open-plan office (wood floor, navy desks) */
@@ -740,6 +741,7 @@
   border: var(--pixel-border) var(--office-trim);
   position: relative;
   padding: 8px;
+  min-height: 0;
 }
 
 /* Middle Room Top: Conference room */
@@ -750,6 +752,7 @@
   padding: 8px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* Middle Room Bottom: Purple lounge */
@@ -758,6 +761,8 @@
   border: var(--pixel-border) var(--office-trim);
   position: relative;
   padding: 8px;
+  min-height: 0;
+  flex-shrink: 0;
 }
 
 /* Right Room: Grey brick server room */
@@ -782,6 +787,7 @@
   border: var(--pixel-border) var(--office-trim);
   position: relative;
   padding: 8px;
+  min-height: 0;
 }
 
 /* ── Desk Widget ── */
