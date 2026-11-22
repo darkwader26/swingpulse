@@ -1,14 +1,11 @@
 {
   "version": 2,
   "framework": "nextjs",
-  "buildCommand": "npm install && npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "outputDirectory": ".next",
-  "routes": [
-    { "src": "/(.*)", "dest": "/frontend/$1" }
-  ],
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "devCommand": "cd frontend && npm run dev",
+  "installCommand": "cd frontend && npm install",
+  "outputDirectory": "frontend/.next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://swingpulse-api-1.onrender.com"
+    "NEXT_PUBLIC_API_URL": "https://swingpulse-api-1.onrender.com/api/v1"
   }
 }
