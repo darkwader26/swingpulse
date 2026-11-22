@@ -6,11 +6,8 @@ from sqlalchemy import (
     String, Integer, Numeric, DateTime, Boolean, Text, ForeignKey, Index, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-class Base(DeclarativeBase):
-    pass
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from database import Base
 
 
 class Instrument(Base):
