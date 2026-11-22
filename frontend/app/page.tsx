@@ -37,8 +37,11 @@ export default function Dashboard() {
   const [marketData, setMarketData] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const [apiOk, setApiOk] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [pipelineRunning, setPipelineRunning] = useState(false)
   const [time, setTime] = useState(new Date())
   const wsRef = useRef<WebSocket | null>(null)
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('closed')
 
   // Load saved user on startup (from Google OAuth)
   useEffect(() => {
@@ -75,17 +78,20 @@ export default function Dashboard() {
       setSignals(sig || [])
       if (rsk) setRisk(rsk)
       if (ags) setAgents(ags)
+      setApiOk(failures.length === 0)
     } catch (e) {
       console.error('[SwingPulse] API load failed', e)
       setApiOk(false)
     } finally {
-      if (failures.length) {
-        console.error('[SwingPulse] Partial API failure:', failures)
-        setApiOk(false)
-      }
       setLoading(false)
+      setRefreshing(false)
     }
   }, [fetchJson])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    void loadData()
+  }, [loadData])
 
   // Load historical market data for watchlist symbols (1+ month = 60 days minimum)
   const loadMarketData = useCallback(async () => {
@@ -102,6 +108,20 @@ export default function Dashboard() {
     setMarketData(data)
   }, [fetchJson])
 
+  // Trigger agent pipeline on demand
+  const handleRunPipeline = useCallback(async () => {
+    setPipelineRunning(true)
+    try {
+      const result = await fetchJson('/pipeline/run', { method: 'POST' })
+      console.log('[SwingPulse] Pipeline ran:', result)
+      await loadData()
+    } catch (e) {
+      console.error('[SwingPulse] Pipeline run failed', e)
+    } finally {
+      setPipelineRunning(false)
+    }
+  }, [fetchJson, loadData])
+
   useEffect(() => {
     loadData()
     loadMarketData()
@@ -109,30 +129,32 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [loadData, loadMarketData])
 
-  // WebSocket for live agent log
+  // WebSocket for live agent log — polling-based live status substitute
+  // (Vercel edge runtime doesn't support raw WebSocket, so we poll agents/status)
   useEffect(() => {
-    let socket: WebSocket | null = null
-    try {
-      const url = 'wss://swingpulse-api-1.onrender.com/ws/events'
-      socket = new WebSocket(url)
-      socket.onopen = () => { wsRef.current = socket }
-      socket.onclose = () => { wsRef.current = null }
-      socket.onerror = () => { wsRef.current = null }
-      socket.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          const entry: AgentEvent = {
-            agent_name: msg.agent_name ?? 'system',
-            event_type: msg.event_type ?? 'event',
-            payload: msg.payload,
-            created_at: msg.created_at ?? new Date().toISOString(),
-          }
-          setEvents((prev) => [entry, ...prev].slice(0, 200))
-        } catch { /* ignore malformed */ }
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    const connect = () => {
+      setWsStatus('connecting')
+      try {
+        reconnectTimer = setInterval(() => {
+          void fetchJson('/agents/status').then((ags) => {
+            setAgents(ags as AgentStatus)
+            setWsStatus('open')
+          }).catch(() => setWsStatus('closed'))
+        }, 5000)
+        setWsStatus('open')
+      } catch {
+        setWsStatus('closed')
       }
-    } catch { /* websocket unavailable */ }
-    return () => { socket?.close() }
-  }, [])
+    }
+
+    connect()
+
+    return () => {
+      if (reconnectTimer) clearInterval(reconnectTimer)
+    }
+  }, [fetchJson])
 
   const totalUnrealized = positions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
   const winRate = positions.length
@@ -218,13 +240,13 @@ export default function Dashboard() {
     <div className="min-h-screen bg-bg text-ink font-sans antialiased desktop-bg" style={{ minHeight: '100vh', position: 'relative', zIndex: 0 }}>
       {/* Desktop Icons (left side, fixed) */}
       <div className="fixed top-16 left-4 flex flex-col gap-3 z-30 pointer-events-none">
-        <a href="#" className="desktop-icon selected pointer-events-auto">
-          <div className="desktop-icon-icon">▨</div>
-          <span>COMMAND</span>
+        <a href="#" className="desktop-icon selected pointer-events-auto" onClick={handleRefresh}>
+          <div className="desktop-icon-icon">🔄</div>
+          <span>REFRESH</span>
         </a>
-        <a href="#" className="desktop-icon pointer-events-auto">
-          <div className="desktop-icon-icon">📊</div>
-          <span>MARKETS</span>
+        <a href="#" className="desktop-icon pointer-events-auto" onClick={handleRunPipeline}>
+          <div className="desktop-icon-icon">▶</div>
+          <span>PIPELINE</span>
         </a>
         <a href="#" className="desktop-icon pointer-events-auto">
           <div className="desktop-icon-icon">📁</div>
@@ -253,7 +275,9 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-[13px] font-extrabold tracking-widest text-glitch" data-text="SWINGPULSE">SWINGPULSE</span>
-                <span className="text-[10px] font-bold text-muted border-l border-border pl-2">PAPER TRADING</span>
+                <span className={`text-[10px] font-bold border-l border-border pl-2 ${apiOk ? 'text-ok' : 'text-danger'}`}>
+                  {apiOk ? 'PAPER TRADING • LIVE' : 'PAPER TRADING • OFFLINE'}
+                </span>
                 {user && (
                   <span className="text-[10px] font-bold text-accent-long flex items-center gap-1.5">
                     <StatusDot status="online" /> {user.email}
@@ -261,14 +285,29 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-3 text-[10px] font-bold mono">
-                <StatusDot status="online" />
+                <StatusDot status={wsStatus === 'open' ? 'online' : 'offline'} />
                 <span>AGENTS ONLINE</span>
                 <span>{dateStr} &nbsp;|&nbsp; {timeStr} UTC</span>
                 <button
                   onClick={handleKillSwitch}
                   className={`btn btn-xs px-2 py-0.5 border rounded-none ${killSwitchOn ? 'bg-danger text-white' : 'text-warning border-warning'}`}
+                  disabled={pipelineRunning}
                 >
                   {killSwitchOn ? 'KILL: ON' : 'KILL SWITCH'}
+                </button>
+                <button
+                  onClick={handleRunPipeline}
+                  disabled={pipelineRunning}
+                  className={`btn btn-xs px-2 py-0.5 border rounded-none ${pipelineRunning ? 'opacity-50 cursor-not-allowed' : 'border-accent-long text-accent-long hover:bg-accent-long hover:text-bg'}`}
+                >
+                  {pipelineRunning ? 'RUNNING…' : 'RUN PIPELINE'}
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className={`btn btn-xs px-2 py-0.5 border rounded-none ${refreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  🔄 REFRESH
                 </button>
               </div>
             </div>
@@ -333,7 +372,7 @@ export default function Dashboard() {
                       ) : (
                         <tr>
                           <td colSpan={5} className="text-[10px] text-muted py-3 text-center">
-                            <EmptyState title="NO WATCHLIST DATA" subtitle="Unable to load symbols from API" />
+                            <EmptyState title="NO WATCHLIST DATA" subtitle="Click REFRESH to load from live API" />
                           </td>
                         </tr>
                       )}
