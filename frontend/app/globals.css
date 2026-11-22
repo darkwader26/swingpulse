@@ -23,6 +23,19 @@
     --crt-glow: rgba(0, 255, 65, 0.15);
     --radius: 0px; /* pixel = sharp corners */
     --pixel-border: 2px solid;
+
+    /* Office pixel-art palette (from reference) */
+    --office-wood-light: #deb887;   /* light tan wood floor */
+    --office-wood-dark: #8b4513;    /* medium brown wood */
+    --office-wall: #f5f5dc;         /* off-white/cream wall */
+    --office-trim: #1a237e;         /* dark navy blue trim */
+    --office-desk: #1a237e;         /* dark navy desk */
+    --office-monitor: #d3d3d3;      /* light grey monitor */
+    --office-lounge: #9370db;       /* purple lounge floor */
+    --office-brick: #d3d3d3;        /* light grey brick */
+    --office-fridge: #ff0000;       /* red fridge/vending */
+    --office-plant: #228b22;        /* green plant */
+    --office-chair-blue: #1e90ff;   /* bright blue chair */
   }
 
   *,
@@ -698,3 +711,256 @@
   .bg-accent-long { background-color: var(--accent-long); }
   .bg-accent-short { background-color: var(--accent-short); }
 }
+
+/* ============================================================================
+   Office Pixel-Art Elements (from reference image)
+   Three-room layout: wood-floor office, conference+lounge, grey-brick server
+   ============================================================================ */
+
+/* ── Three-Room Office Background ── */
+.office-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  height: 100%;
+  width: 100%;
+}
+
+/* Left Room: Open-plan office (wood floor, navy desks) */
+.office-room--main {
+  background: var(--office-wood-light);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--office-wood-light) 0,
+      var(--office-wood-light) 3px,
+      var(--office-wood-dark) 3px,
+      var(--office-wood-dark) 4px
+    );
+  border: var(--pixel-border) var(--office-trim);
+  position: relative;
+  padding: 8px;
+}
+
+/* Middle Room Top: Conference room */
+.office-room--conference {
+  background: var(--office-wall);
+  border: var(--pixel-border) var(--office-trim);
+  position: relative;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Middle Room Bottom: Purple lounge */
+.office-room--lounge {
+  background: var(--office-lounge);
+  border: var(--pixel-border) var(--office-trim);
+  position: relative;
+  padding: 8px;
+}
+
+/* Right Room: Grey brick server room */
+.office-room--server {
+  background: var(--office-brick);
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      var(--office-brick) 0,
+      var(--office-brick) 8px,
+      #c0c0c0 8px,
+      #c0c0c0 16px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--office-brick) 0,
+      var(--office-brick) 8px,
+      #c0c0c0 8px,
+      #c0c0c0 16px
+    );
+  background-size: 16px 16px;
+  border: var(--pixel-border) var(--office-trim);
+  position: relative;
+  padding: 8px;
+}
+
+/* ── Desk Widget ── */
+.office-desk {
+  position: relative;
+  width: 100%;
+  height: 72px;
+  background: var(--office-desk);
+  border: 1px solid var(--office-trim);
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.office-desk-monitor {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 14px;
+  background: var(--office-monitor);
+  border: 1px solid #000;
+  border-bottom: none;
+}
+
+.office-desk-monitor::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 4px;
+  background: #000;
+}
+
+.office-desk-screen {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background: #000;
+  border: 1px solid var(--office-monitor);
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  color: var(--accent-long);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.office-desk:has(.office-desk-screen[data-status="active"]) .office-desk-screen {
+  color: var(--success);
+}
+
+.office-desk:has(.office-desk-screen[data-status="short"]) .office-desk-screen {
+  color: var(--accent-short);
+}
+
+/* ── Conference Table ── */
+.office-conference-table {
+  position: relative;
+  width: 100%;
+  max-width: 200px;
+  height: 96px;
+  background: #000;
+  border: 2px solid var(--office-trim);
+  border-radius: 50% / 20%;
+  margin: 8px auto;
+  box-shadow: 4px 4px 0px #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.office-conference-table::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--border-bright);
+  border-radius: 50% / 20%;
+}
+
+.office-conference-chair {
+  width: 16px;
+  height: 16px;
+  background: var(--office-chair-blue);
+  border: 1px solid #000;
+  position: absolute;
+}
+
+.office-conference-chair--top { top: -18px; left: 50%; transform: translateX(-50%); }
+.office-conference-chair--bottom { bottom: -18px; left: 50%; transform: translateX(-50%); }
+.office-conference-chair--left { left: -18px; top: 50%; transform: translateY(-50%); }
+.office-conference-chair--right { right: -18px; top: 50%; transform: translateY(-50%); }
+
+/* ── Server Rack ── */
+.office-server-rack {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  background: var(--office-desk);
+  border: 1px solid var(--office-trim);
+  margin: 2px;
+  display: inline-block;
+}
+
+.office-server-rack-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--office-monitor);
+  border-bottom: 1px solid #000;
+}
+
+.office-server-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+/* ── Plant ── */
+.office-plant {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: var(--office-plant);
+  border: 1px solid #000;
+  border-radius: 50%;
+  box-shadow: 2px 2px 0px #000;
+}
+
+/* ── Clock ── */
+.office-clock {
+  width: 16px;
+  height: 16px;
+  background: #000;
+  border: 2px solid var(--border-bright);
+  border-radius: 50%;
+  position: relative;
+  margin: 4px auto;
+}
+
+.office-clock::before, .office-clock::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--office-fridge);
+  border-radius: 50%;
+}
+.office-clock::before { width: 2px; height: 6px; transform: translate(-50%, -50%) rotate(0deg); }
+.office-clock::after { width: 2px; height: 4px; transform: translate(-50%, -50%) rotate(90deg); }
+
+/* ── Room Label ── */
+.office-room-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  background: var(--office-wall);
+  padding: 1px 4px;
+  border: 1px solid var(--office-trim);
+}
+
+/* ── Utility colors for office zones ── */
+.bg-office-wood { background-color: var(--office-wood-light); }
+.bg-office-lounge { background-color: var(--office-lounge); }
+.bg-office-brick { background-color: var(--office-brick); }
+.bg-office-wall { background-color: var(--office-wall); }
+.text-office-trim { color: var(--office-trim); }
+.text-office-desk { color: var(--office-desk); }

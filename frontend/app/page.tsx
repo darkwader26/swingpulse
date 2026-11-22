@@ -144,8 +144,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-bg text-ink font-sans antialiased desktop-bg" style={{ minHeight: '100vh', position: 'relative', zIndex: 0 }}>
-      {/* CRT overlay handled in CSS ::before/::after on body */}
-
       {/* Desktop Icons (left side) */}
       <div className="fixed top-12 left-4 flex flex-col gap-4 z-20 pointer-events-none">
         <a href="#" className="desktop-icon selected pointer-events-auto">
@@ -193,93 +191,151 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* Row 2: Kill Switch + Metrics */}
-          <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-3">
-              <KillSwitch initial={risk.kill_switch} />
-            </div>
-            <div className="col-span-3">
-              <div className="card h-full">
-                <MetricCard label="TODAY P&L" value={totalUnrealized >= 0 ? `+$${totalUnrealized.toFixed(2)}` : `-$${Math.abs(totalUnrealized).toFixed(2)}`} delta={totalUnrealized >= 0 ? `+${(totalUnrealized / 10000 * 100).toFixed(2)}%` : `-${Math.abs(totalUnrealized / 10000 * 100).toFixed(2)}%`} deltaType={totalUnrealized >= 0 ? 'pos' : 'neg'} subLabel="UNREALIZED" />
-              </div>
-            </div>
-            <div className="col-span-3">
-              <div className="card h-full">
-                <MetricCard label="WIN RATE" value={winRate} delta="LAST 50 TRADES" deltaType="neu" />
-              </div>
-            </div>
-            <div className="col-span-3">
-              <div className="card h-full">
-                <MetricCard label="OPEN POSITIONS" value={positions.length} delta={`MAX ${risk.max_positions}`} deltaType="neu" />
-              </div>
-            </div>
-          </div>
-
-          {/* Row 3: Watchlist + Equity + Risk */}
-          <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
-            <div className="col-span-3 min-h-0">
-              <div className="card h-full flex flex-col">
-                <h2 className="flex-shrink-0">WATCHLIST</h2>
-                <div className="flex-1 scroll min-h-0">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '70px' }}>SYMBOL</th>
-                        <th style={{ width: '80px' }}>PRICE</th>
-                        <th style={{ width: '80px' }}>P&L</th>
-                        <th style={{ width: '80px' }}>REGIME</th>
-                        <th>STATUS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {positions.length > 0 ? (
-                        positions.map((p) => (
-                          <tr key={p.symbol}>
-                            <td className="mono">{p.symbol}</td>
-                            <td className="mono">${p.entry.toFixed(2)}</td>
-                            <td className={`mono ${pnlSign(p.unrealized_pnl)}`}>{p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(2)}</td>
-                            <td className="text-muted">{regime(p.symbol)}</td>
-                            <td><span className="badge badge-approved">OPEN</span></td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="text-muted py-4 text-center">
-                            <EmptyState title="NO WATCHLIST DATA" subtitle="Unable to load symbols" />
-                          </td>
+          {/* Row 2: Three-Room Office Layout */}
+          <div className="office-layout flex-1 min-h-0 gap-0">
+            {/* ── Left Room: Open-plan Office (wood floor, navy desks) ── */}
+            <div className="office-room--main flex flex-col gap-2">
+              <div className="office-room-label">MAIN OFFICE</div>
+              {/* Watchlist desks */}
+              <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">WATCHLIST</h2>
+              <div className="flex-1 scroll min-h-0">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '70px' }}>SYMBOL</th>
+                      <th style={{ width: '80px' }}>PRICE</th>
+                      <th style={{ width: '80px' }}>P&L</th>
+                      <th style={{ width: '80px' }}>REGIME</th>
+                      <th>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {positions.length > 0 ? (
+                      positions.map((p) => (
+                        <tr key={p.symbol}>
+                          <td className="mono">{p.symbol}</td>
+                          <td className="mono">${p.entry.toFixed(2)}</td>
+                          <td className={`mono ${pnlSign(p.unrealized_pnl)}`}>{p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(2)}</td>
+                          <td className="text-muted">{regime(p.symbol)}</td>
+                          <td><span className="badge badge-approved">OPEN</span></td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="text-muted py-4 text-center">
+                          <EmptyState title="NO WATCHLIST DATA" subtitle="Unable to load symbols" />
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-
-            <div className="col-span-6 min-h-0">
-              <div className="card h-full flex flex-col">
-                <h2 className="flex-shrink-0">EQUITY CURVE</h2>
-                <div className="flex-1 min-h-0 relative">
-                  <EquityCurve data={equityData} />
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-3 min-h-0">
-              <RiskHeatmap risk={risk} />
-            </div>
-          </div>
-
-          {/* Row 4: Positions + Signal Pipeline */}
-          <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-8">
-              <div className="card h-full flex flex-col">
-                <h2 className="flex-shrink-0">OPEN POSITIONS</h2>
-                <div className="flex-1 scroll min-h-0">
+              {/* Open positions as desk widgets */}
+              <div className="mt-4 flex flex-col gap-2">
+                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">OPEN POSITIONS</h2>
+                <div className="flex-1 min-h-0">
                   <PositionsTable positions={positions} />
                 </div>
               </div>
+              {/* Plant decor */}
+              <div className="mt-2 flex justify-end gap-2">
+                <span className="office-plant" title="Ficus" />
+                <span className="office-plant" title="Pothos" />
+                <span className="office-plant" title="Snake" />
+              </div>
             </div>
-            <div className="col-span-4">
+
+            {/* ── Middle Room ── */}
+            <div className="flex flex-col gap-4">
+              {/* Conference room (top) */}
+              <div className="office-room--conference flex flex-col gap-2">
+                <div className="office-room-label">CONFERENCE</div>
+                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">COMMAND TABLE</h2>
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="office-conference-table relative">
+                    <span className="absolute top-2 left-2 text-[10px] text-office-trim font-bold">SYSTEM STATUS</span>
+                    <div className="text-[24px] font-black text-glitch" data-text="ONLINE">ONLINE</div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="card h-full p-2">
+                      <div className="text-label mb-1">TODAY P&L</div>
+                      <div className="metric-value">{totalUnrealized >= 0 ? '+' : ''}$${totalUnrealized.toFixed(2)}</div>
+                      <div className={`metric-delta ${totalUnrealized >= 0 ? 'pos' : 'neg'}`}>{totalUnrealized >= 0 ? '+' : ''}${(totalUnrealized / 10000 * 100).toFixed(2)}%</div>
+                    </div>
+                    <div className="card h-full p-2">
+                      <div className="text-label mb-1">WIN RATE</div>
+                      <div className="metric-value">{winRate}</div>
+                      <div className="metric-delta neu">LAST 50 TRADES</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 card h-full p-2 flex flex-col">
+                    <div className="text-label mb-1">EQUITY CURVE</div>
+                    <div className="flex-1 min-h-0 relative">
+                      <EquityCurve data={equityData} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Purple lounge (bottom) - paper trading zone */}
+              <div className="office-room--lounge flex flex-col gap-2 h-48">
+                <div className="office-room-label">LOUNGE</div>
+                <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">PAPER TRADING LOUNGE</h2>
+                <div className="flex-1 flex items-center justify-center gap-4">
+                  <KillSwitch initial={risk.kill_switch} />
+                  <div className="text-xs font-bold mono text-office-desk">
+                    <span className="status-dot standby" />{' '}
+                    SIMULATION MODE — NO LIVE CAPITAL
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-center gap-2">
+                  <span className="office-plant" title="Ficus" />
+                  <span className="office-plant" title="Pothos" />
+                  <span className="office-plant" title="Snake" />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Right Room: Server Room (grey brick) ── */}
+            <div className="office-room--server flex flex-col gap-2">
+              <div className="office-room-label">SERVER ROOM</div>
+              <h2 className="flex-shrink-0 text-xs mb-2 text-office-trim font-extrabold tracking-tighter">AGENT RACKS</h2>
+              <div className="flex-1 min-h-0">
+                <div className="office-server-grid">
+                  <div className="office-server-rack" title="Scanner">
+                    <div className="office-server-rack-top" />
+                    <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.scanner.status}</span>
+                  </div>
+                  <div className="office-server-rack" title="Signal Gen">
+                    <div className="office-server-rack-top" />
+                    <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.signal_generator.status}</span>
+                  </div>
+                  <div className="office-server-rack" title="Risk Mgmt">
+                    <div className="office-server-rack-top" />
+                    <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.risk_manager.status}</span>
+                  </div>
+                  <div className="office-server-rack" title="Executor">
+                    <div className="office-server-rack-top" />
+                    <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.executor.status}</span>
+                  </div>
+                  <div className="office-server-rack" title="Ops">
+                    <div className="office-server-rack-top" />
+                    <span className="absolute top-5 left-1 right-1 text-[9px] text-center mono text-office-monitor">{agents.ops.status}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 card h-full p-2 flex flex-col">
+                <div className="text-label mb-1">RISK HEATMAP</div>
+                <div className="flex-1 min-h-0">
+                  <RiskHeatmap risk={risk} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Signal Pipeline */}
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-6">
               <div className="card h-full flex flex-col">
                 <h2 className="flex-shrink-0">SIGNAL PIPELINE</h2>
                 <div className="flex-1 scroll min-h-0">
@@ -287,13 +343,13 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Row 5: Agent Log */}
-          <div className="card h-48 flex flex-col">
-            <h2 className="flex-shrink-0">AGENT DECISION LOG</h2>
-            <div className="flex-1 scroll min-h-0">
-              <AgentLog initialEvents={events} />
+            <div className="col-span-6">
+              <div className="card h-full flex flex-col">
+                <h2 className="flex-shrink-0">AGENT DECISION LOG</h2>
+                <div className="flex-1 scroll min-h-0">
+                  <AgentLog initialEvents={events} />
+                </div>
+              </div>
             </div>
           </div>
 
